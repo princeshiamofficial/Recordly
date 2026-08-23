@@ -1,4 +1,9 @@
-import { DownloadSimple as Download, FilmSlate as Film, Image } from "@phosphor-icons/react";
+import {
+	DownloadSimple as Download,
+	FilmSlate as Film,
+	Image,
+	Lightning,
+} from "@phosphor-icons/react";
 import { LayoutGroup, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -41,6 +46,7 @@ interface ExportSettingsMenuProps {
 	onGifSizePresetChange?: (preset: GifSizePreset) => void;
 	gifOutputDimensions: { width: number; height: number };
 	onExport?: () => void;
+	onInstantExport?: () => void;
 	className?: string;
 }
 
@@ -70,6 +76,7 @@ export function ExportSettingsMenu({
 	onGifSizePresetChange,
 	gifOutputDimensions,
 	onExport,
+	onInstantExport,
 	className,
 }: ExportSettingsMenuProps) {
 	const tSettings = useScopedT("settings");
@@ -151,7 +158,7 @@ export function ExportSettingsMenu({
 									{isActive ? (
 										<motion.span
 											layoutId="header-export-quality-pill"
-										className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 											transition={{
 												type: "spring",
 												stiffness: 420,
@@ -163,17 +170,19 @@ export function ExportSettingsMenu({
 										<span
 											className={cn(
 												isActive
-												? "text-white dark:text-black"
-												: "text-muted-foreground hover:text-foreground",
-										)}
-									>
-										{option.label}
-									</span>
-									{mp4OutputDimensions ? (
-										<span
-											className={cn(
-												"mt-0.5 text-[9px]",
-												isActive ? "text-white/75 dark:text-black/75" : "text-muted-foreground/70",
+													? "text-white dark:text-black"
+													: "text-muted-foreground hover:text-foreground",
+											)}
+										>
+											{option.label}
+										</span>
+										{mp4OutputDimensions ? (
+											<span
+												className={cn(
+													"mt-0.5 text-[9px]",
+													isActive
+														? "text-white/75 dark:text-black/75"
+														: "text-muted-foreground/70",
 												)}
 											>
 												{mp4OutputDimensions[option.value].width} x{" "}
@@ -216,7 +225,7 @@ export function ExportSettingsMenu({
 									{isActive ? (
 										<motion.span
 											layoutId="header-export-encoding-pill"
-										className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 											transition={{
 												type: "spring",
 												stiffness: 420,
@@ -257,7 +266,7 @@ export function ExportSettingsMenu({
 									{isActive ? (
 										<motion.span
 											layoutId="header-export-fps-pill"
-										className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 											transition={{
 												type: "spring",
 												stiffness: 420,
@@ -309,7 +318,7 @@ export function ExportSettingsMenu({
 									{isActive ? (
 										<motion.span
 											layoutId="header-export-pipeline-pill"
-										className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 											transition={{
 												type: "spring",
 												stiffness: 420,
@@ -375,7 +384,10 @@ export function ExportSettingsMenu({
 						<div className="mb-3 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-foreground/10 bg-foreground/5 px-3 py-2">
 							<div className="min-w-0">
 								<p className="text-[11px] font-semibold text-foreground">
-									{tSettings("export.captionSidecar.title", "Export captions file")}
+									{tSettings(
+										"export.captionSidecar.title",
+										"Export captions file",
+									)}
 								</p>
 								<p className="mt-0.5 truncate text-[10px] text-muted-foreground/75">
 									{tSettings(
@@ -414,7 +426,7 @@ export function ExportSettingsMenu({
 											{isActive ? (
 												<motion.span
 													layoutId="header-gif-frame-rate-pill"
-											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+													className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 													transition={{
 														type: "spring",
 														stiffness: 420,
@@ -454,7 +466,7 @@ export function ExportSettingsMenu({
 											{isActive ? (
 												<motion.span
 													layoutId="header-gif-size-pill"
-											className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+													className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
 													transition={{
 														type: "spring",
 														stiffness: 420,
@@ -509,17 +521,28 @@ export function ExportSettingsMenu({
 				</div>
 			)}
 
-			<Button
-				type="button"
-				size="lg"
-				onClick={onExport}
-				className="h-11 w-full gap-2 rounded-lg bg-[#2563EB] text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#2563EB]/90"
-			>
-				<Download className="h-4 w-4" />
-				{tSettings("export.exportVideo", undefined, {
-					format: exportFormat === "gif" ? "GIF" : "Video",
-				})}
-			</Button>
+			<div className="space-y-2">
+				<Button
+					type="button"
+					size="lg"
+					onClick={onInstantExport || onExport}
+					className="h-10 w-full gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-xs font-bold text-white shadow-sm transition-all hover:from-blue-500 hover:to-indigo-500"
+				>
+					<Lightning className="h-4 w-4 fill-current text-yellow-300" />
+					<span>Instant Export (No Delay)</span>
+				</Button>
+				<Button
+					type="button"
+					size="lg"
+					onClick={onExport}
+					className="h-9 w-full gap-2 rounded-lg border border-foreground/10 bg-foreground/5 text-xs font-medium text-foreground transition-colors hover:bg-foreground/10"
+				>
+					<Download className="h-3.5 w-3.5" />
+					{tSettings("export.exportVideo", undefined, {
+						format: exportFormat === "gif" ? "GIF" : "Video",
+					})}
+				</Button>
+			</div>
 		</div>
 	);
 }

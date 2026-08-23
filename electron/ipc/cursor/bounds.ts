@@ -119,7 +119,9 @@ export function parseXwininfoBounds(stdout: string): WindowBounds | null {
 	};
 }
 
-export async function resolveLinuxWindowBounds(source: SelectedSource): Promise<WindowBounds | null> {
+export async function resolveLinuxWindowBounds(
+	source: SelectedSource,
+): Promise<WindowBounds | null> {
 	const windowId = parseWindowId(source?.id);
 
 	if (windowId) {
@@ -153,7 +155,9 @@ export async function resolveLinuxWindowBounds(source: SelectedSource): Promise<
 	}
 }
 
-export async function resolveWindowsWindowBounds(source: SelectedSource): Promise<WindowBounds | null> {
+export async function resolveWindowsWindowBounds(
+	source: SelectedSource,
+): Promise<WindowBounds | null> {
 	const windowId = parseWindowId(source?.id);
 	const windowTitle =
 		typeof source.windowTitle === "string" ? source.windowTitle.trim() : source.name.trim();
@@ -259,7 +263,9 @@ export function startWindowBoundsCapture() {
 	}
 
 	void refreshSelectedWindowBounds();
-	setWindowBoundsCaptureInterval(setInterval(() => {
-		void refreshSelectedWindowBounds();
-	}, 250));
+	setWindowBoundsCaptureInterval(
+		setInterval(() => {
+			void refreshSelectedWindowBounds();
+		}, 250),
+	);
 }

@@ -173,6 +173,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	hudOverlayDrag: (phase: "start" | "move" | "end", screenX: number, screenY: number) => {
 		ipcRenderer.send("hud-overlay-drag", phase, screenX, screenY);
 	},
+	hudOverlayShow: () => {
+		ipcRenderer.send("hud-overlay-show");
+	},
 	hudOverlayHide: () => {
 		ipcRenderer.send("hud-overlay-hide");
 	},
@@ -184,6 +187,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 	hudOverlaySetWebcamPreviewVisible: (visible: boolean) => {
 		ipcRenderer.send("hud-overlay-set-webcam-preview-visible", visible);
+	},
+	hudOverlaySetTeleprompterVisible: (visible: boolean) => {
+		ipcRenderer.send("hud-overlay-set-teleprompter-visible", visible);
 	},
 	getHudOverlayCaptureProtection: () => {
 		return ipcRenderer.invoke("get-hud-overlay-capture-protection");

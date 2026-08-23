@@ -126,6 +126,8 @@ type DesktopCaptureMediaDevices = {
 	getDisplayMedia: (constraints: unknown) => Promise<MediaStream>;
 };
 
+export type AudioRecordingMode = "internal" | "external" | "both" | "none";
+
 type UseScreenRecorderReturn = {
 	recording: boolean;
 	paused: boolean;
@@ -143,6 +145,8 @@ type UseScreenRecorderReturn = {
 	setMicrophoneDeviceId: (deviceId: string | undefined) => void;
 	systemAudioEnabled: boolean;
 	setSystemAudioEnabled: (enabled: boolean) => void;
+	audioMode: AudioRecordingMode;
+	setAudioMode: (mode: AudioRecordingMode) => void;
 	webcamEnabled: boolean;
 	setWebcamEnabled: (enabled: boolean) => void;
 	webcamDeviceId: string | undefined;
@@ -213,10 +217,7 @@ export function resolveBrowserCaptureCursorPolicy({
 export function shouldUseNativeWindowsCaptureForSource(
 	source: Pick<ProcessedDesktopSource, "id"> | null | undefined,
 ): boolean {
-	return (
-		source?.id?.startsWith("screen:") === true ||
-		source?.id?.startsWith("window:") === true
-	);
+	return source?.id?.startsWith("screen:") === true || source?.id?.startsWith("window:") === true;
 }
 
 export function createProcessedMicrophoneConstraints(
@@ -2101,6 +2102,39 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		startRecording();
 	};
 
+	const audioMode: AudioRecordingMode =
+		systemAudioEnabled && microphoneEnabled
+			? "both"
+			: systemAudioEnabled && !microphoneEnabled
+				? "internal"
+				: !systemAudioEnabled && microphoneEnabled
+					? "external"
+					: "none";
+
+	const setAudioMode = useCallback(
+		(mode: AudioRecordingMode) => {
+			switch (mode) {
+				case "internal":
+					persistSystemAudioEnabled(true);
+					persistMicrophoneEnabled(false);
+					break;
+				case "external":
+					persistSystemAudioEnabled(false);
+					persistMicrophoneEnabled(true);
+					break;
+				case "both":
+					persistSystemAudioEnabled(true);
+					persistMicrophoneEnabled(true);
+					break;
+				case "none":
+					persistSystemAudioEnabled(false);
+					persistMicrophoneEnabled(false);
+					break;
+			}
+		},
+		[persistSystemAudioEnabled, persistMicrophoneEnabled],
+	);
+
 	return {
 		recording,
 		paused,
@@ -2118,6 +2152,8 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		setMicrophoneDeviceId: persistMicrophoneDeviceId,
 		systemAudioEnabled,
 		setSystemAudioEnabled: persistSystemAudioEnabled,
+		audioMode,
+		setAudioMode,
 		webcamEnabled,
 		setWebcamEnabled,
 		webcamDeviceId,

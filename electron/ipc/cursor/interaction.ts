@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { HookMouseEvent, UiohookLike, UiohookModuleNamespace, CursorInteractionType } from "../types";
+import type {
+	HookMouseEvent,
+	UiohookLike,
+	UiohookModuleNamespace,
+	CursorInteractionType,
+} from "../types";
 import {
 	isCursorCaptureActive,
 	interactionCaptureCleanup,
@@ -255,11 +260,7 @@ export async function startInteractionCapture() {
 		};
 
 		const onMouseMove = (event: HookMouseEvent) => {
-			if (
-				process.platform !== "linux" ||
-				!isCursorCaptureActive ||
-				isCursorCapturePaused()
-			) {
+			if (process.platform !== "linux" || !isCursorCaptureActive || isCursorCapturePaused()) {
 				return;
 			}
 

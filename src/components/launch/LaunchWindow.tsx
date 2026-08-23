@@ -1,5 +1,6 @@
 import {
 	ArrowClockwiseIcon,
+	ArticleIcon,
 	CaretUpIcon,
 	DotsThreeVerticalIcon,
 	MicrophoneIcon,
@@ -12,7 +13,7 @@ import {
 	XIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RxDragHandleDots2 } from "react-icons/rx";
 import { Separator } from "@/components/ui/separator";
 import { useScopedT } from "../../contexts/I18nContext";
@@ -41,6 +42,7 @@ import { SourcePopover } from "./popovers/SourcePopover";
 import { WebcamPopover } from "./popovers/WebcamPopover";
 import { RecordingControls } from "./RecordingControls";
 import { MarqueeText } from "./SourceSelector";
+import { TeleprompterWidget } from "./TeleprompterWidget";
 
 const SHOW_DEV_UPDATE_PREVIEW = import.meta.env.DEV;
 
@@ -55,6 +57,7 @@ export function LaunchWindow() {
 function LaunchWindowContent() {
 	const t = useScopedT("launch");
 	const { openId, requestClose, requestOpen } = useLaunchPopoverCoordinator();
+	const [showTeleprompter, setShowTeleprompter] = useState(false);
 
 	const {
 		recording,
@@ -71,6 +74,8 @@ function LaunchWindowContent() {
 		setMicrophoneDeviceId,
 		systemAudioEnabled,
 		setSystemAudioEnabled,
+		audioMode,
+		setAudioMode,
 		webcamEnabled,
 		setWebcamEnabled,
 		webcamDeviceId,
@@ -157,8 +162,13 @@ function LaunchWindowContent() {
 	}, [showRecordingWebcamPreview]);
 
 	useEffect(() => {
+		window.electronAPI?.hudOverlaySetTeleprompterVisible?.(showTeleprompter);
+	}, [showTeleprompter]);
+
+	useEffect(() => {
 		return () => {
 			window.electronAPI?.hudOverlaySetWebcamPreviewVisible?.(false);
+			window.electronAPI?.hudOverlaySetTeleprompterVisible?.(false);
 		};
 	}, []);
 
@@ -211,6 +221,12 @@ function LaunchWindowContent() {
 			paused={paused}
 			microphoneEnabled={microphoneEnabled}
 			elapsed={elapsed}
+			showWebcamPreview={showFloatingWebcamPreview}
+			onToggleWebcamPreview={
+				webcamEnabled ? () => setShowFloatingWebcamPreview((prev) => !prev) : undefined
+			}
+			showTeleprompter={showTeleprompter}
+			onToggleTeleprompter={() => setShowTeleprompter((prev) => !prev)}
 			onToggleMicrophone={() => setMicrophoneEnabled(!microphoneEnabled)}
 			onPauseResume={paused ? resumeRecording : pauseRecording}
 			onStopRecording={toggleRecording}
@@ -259,6 +275,8 @@ function LaunchWindowContent() {
 				onToggleSystemAudio={() => setSystemAudioEnabled(!systemAudioEnabled)}
 				microphoneEnabled={microphoneEnabled}
 				onDisableMicrophone={() => setMicrophoneEnabled(false)}
+				audioMode={audioMode}
+				onSelectAudioMode={setAudioMode}
 				devices={devices}
 				microphoneDeviceId={microphoneDeviceId}
 				selectedDeviceId={selectedDeviceId}
@@ -343,6 +361,17 @@ function LaunchWindowContent() {
 					</Button>
 				}
 			/>
+
+			<Button
+				variant="ghost"
+				size="icon"
+				iconSize="lg"
+				title={t("recording.teleprompterToggle", "Toggle teleprompter overlay")}
+				onClick={() => setShowTeleprompter((prev) => !prev)}
+				className={showTeleprompter ? styles.ibActive : ""}
+			>
+				<ArticleIcon size={18} />
+			</Button>
 
 			<button
 				type="button"
@@ -443,6 +472,13 @@ function LaunchWindowContent() {
 		<HudInteractionContext.Provider
 			value={{ onMouseEnter: handleHudMouseEnter, onMouseLeave: handleHudMouseLeave }}
 		>
+			{showTeleprompter && (
+				<TeleprompterWidget
+					onClose={() => setShowTeleprompter(false)}
+					recordingActive={recording}
+				/>
+			)}
+
 			<div
 				className="w-full flex justify-center bg-transparent overflow-visible items-end pb-5 pointer-events-none"
 				style={{ height: "100vh" }}

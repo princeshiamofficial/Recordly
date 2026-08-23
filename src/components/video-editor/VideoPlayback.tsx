@@ -171,9 +171,7 @@ import {
 	SNAP_TO_EDGES_RATIO_AUTO,
 } from "./videoPlayback/cursorFollowCamera";
 import { clampFocusToStage as clampFocusToStageUtil } from "./videoPlayback/focusUtils";
-import {
-	layoutVideoContent as layoutVideoContentUtil,
-} from "./videoPlayback/layoutUtils";
+import { layoutVideoContent as layoutVideoContentUtil } from "./videoPlayback/layoutUtils";
 import { updateOverlayIndicator } from "./videoPlayback/overlayUtils";
 import { createVideoEventHandlers } from "./videoPlayback/videoEventHandlers";
 import { getWebcamMediaTargetTimeSeconds, shouldSeekWebcamMedia } from "./videoPlayback/webcamSync";
@@ -528,6 +526,33 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				setFrameUpdateCounter((c) => c + 1);
 			});
 		}, []);
+
+		const [resolvedVideoSrc, setResolvedVideoSrc] = useState<string>("");
+
+		useEffect(() => {
+			let mounted = true;
+			if (!videoPath) {
+				setResolvedVideoSrc("");
+				return;
+			}
+
+			void getRenderableVideoUrl(videoPath)
+				.then((url) => {
+					if (mounted) {
+						setResolvedVideoSrc(url);
+					}
+				})
+				.catch((err) => {
+					console.warn("[VideoPlayback] Failed to resolve renderable video URL:", err);
+					if (mounted) {
+						setResolvedVideoSrc(videoPath);
+					}
+				});
+
+			return () => {
+				mounted = false;
+			};
+		}, [videoPath]);
 
 		const overlayRef = useRef<HTMLDivElement | null>(null);
 		const focusIndicatorRef = useRef<HTMLDivElement | null>(null);
@@ -3426,7 +3451,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 					browser continues producing presented frames for Pixi and preview sync. */}
 				<video
 					ref={videoRef}
-					src={videoPath}
+					src={resolvedVideoSrc || videoPath}
 					className={fallbackVideoClassName}
 					preload="metadata"
 					playsInline
@@ -3447,11 +3472,30 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 									: code === MediaError.MEDIA_ERR_DECODE
 										? "decode error"
 										: msg || `code ${code ?? "unknown"}`;
+
+						if (
+							resolvedVideoSrc.startsWith("http://") &&
+							videoPath &&
+							!videoPath.startsWith("http")
+						) {
+							const fileUrl = /^file:\/\//i.test(videoPath)
+								? videoPath
+								: `file:///${videoPath.replace(/\\/g, "/")}`;
+							console.warn(
+								"[VideoPlayback] Local media server URL failed, falling back to file URL:",
+								fileUrl,
+							);
+							setResolvedVideoSrc(fileUrl);
+							return;
+						}
+
 						console.error(
 							"[VideoPlayback] Video load error:",
 							detail,
 							"src:",
 							videoPath,
+							"resolvedSrc:",
+							resolvedVideoSrc,
 						);
 						onError(`Failed to load video (${detail})`);
 					}}

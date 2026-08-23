@@ -42,12 +42,17 @@ export function shouldExpandHudOverlayFallback({
 	fallbackExpanded,
 	recordingActive,
 	webcamPreviewVisible,
+	teleprompterVisible,
 }: {
 	fallbackExpanded: boolean;
 	recordingActive: boolean;
 	webcamPreviewVisible: boolean;
+	teleprompterVisible?: boolean;
 }): boolean {
-	return fallbackExpanded || (recordingActive && webcamPreviewVisible);
+	return (
+		fallbackExpanded ||
+		(recordingActive && (webcamPreviewVisible || Boolean(teleprompterVisible)))
+	);
 }
 
 export function resizeHudOverlayFallbackBounds(

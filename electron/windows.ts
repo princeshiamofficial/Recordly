@@ -35,6 +35,7 @@ let hudOverlaySourceSelectionActive = false;
 let hudOverlayMouseReassertTimer: NodeJS.Timeout | null = null;
 let hudOverlayRecordingActive = false;
 let hudOverlayWebcamPreviewVisible = false;
+let hudOverlayTeleprompterVisible = false;
 let countdownWindow: BrowserWindow | null = null;
 let updateToastWindow: BrowserWindow | null = null;
 
@@ -199,10 +200,11 @@ function getHudOverlayBounds() {
 		fallbackExpanded: hudOverlayFallbackExpanded,
 		recordingActive: hudOverlayRecordingActive,
 		webcamPreviewVisible: hudOverlayWebcamPreviewVisible,
+		teleprompterVisible: hudOverlayTeleprompterVisible,
 	});
 	return getHudOverlayWindowBounds(
 		workArea,
-		isHudOverlayMousePassthroughSupported() && !hudOverlayRecordingActive,
+		isHudOverlayMousePassthroughSupported(),
 		fallbackExpanded,
 	);
 }
@@ -303,13 +305,6 @@ function setHudOverlayMousePassthrough(ignore: boolean) {
 		return;
 	}
 
-	if (hudOverlayRecordingActive) {
-		hudOverlayFallbackExpanded = false;
-		applyHudOverlayBounds();
-		hudOverlayWindow.setIgnoreMouseEvents(false);
-		return;
-	}
-
 	if (!isHudOverlayMousePassthroughSupported()) {
 		if (process.platform !== "linux") {
 			setHudOverlayFallbackExpanded(!ignore);
@@ -328,6 +323,11 @@ function setHudOverlayMousePassthrough(ignore: boolean) {
 
 ipcMain.on("hud-overlay-set-ignore-mouse", (_event, ignore: boolean) => {
 	setHudOverlayMousePassthrough(Boolean(ignore));
+});
+
+ipcMain.on("hud-overlay-set-teleprompter-visible", (_event, visible: boolean) => {
+	hudOverlayTeleprompterVisible = Boolean(visible);
+	applyHudOverlayBounds();
 });
 
 ipcMain.on("hud-overlay-set-source-selection-active", (_event, active: boolean) => {
@@ -396,6 +396,36 @@ ipcMain.on("hud-overlay-drag", (_event, phase: string, screenX: number, screenY:
 		hudDragLastCursor = null;
 		hudDragFixedSize = null;
 	}
+});
+
+export function showHudOverlayWindow(): void {
+	if (!hudOverlayWindow || hudOverlayWindow.isDestroyed()) {
+		createHudOverlayWindow();
+	}
+
+	if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
+		if (hudOverlayWindow.isMinimized()) {
+			hudOverlayWindow.restore();
+		}
+		if (!hudOverlayWindow.isVisible()) {
+			hudOverlayWindow.show();
+		}
+		hudOverlayWindow.moveTop();
+		hudOverlayWindow.focus();
+		if (process.platform === "win32" && isHudOverlayMousePassthroughSupported()) {
+			hudOverlayIgnoringMouse = false;
+			hudOverlayWindow.setIgnoreMouseEvents(false);
+			setTimeout(() => {
+				if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
+					setHudOverlayMousePassthrough(hudOverlayIgnoringMouse);
+				}
+			}, 50);
+		}
+	}
+}
+
+ipcMain.on("hud-overlay-show", () => {
+	showHudOverlayWindow();
 });
 
 ipcMain.on("hud-overlay-hide", () => {

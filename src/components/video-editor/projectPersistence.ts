@@ -187,7 +187,7 @@ export function normalizeExportEncodingMode(value: unknown): ExportEncodingMode 
 		return value;
 	}
 
-	return "balanced";
+	return "fast";
 }
 
 export function normalizeExportBackendPreference(value: unknown): ExportBackendPreference {

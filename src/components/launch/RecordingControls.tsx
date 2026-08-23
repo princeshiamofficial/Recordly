@@ -1,4 +1,15 @@
-import { MicrophoneIcon, MicrophoneSlashIcon, MinusIcon, PauseIcon, PlayIcon, SquareIcon, XIcon } from "@phosphor-icons/react";
+import {
+	ArticleIcon,
+	MicrophoneIcon,
+	MicrophoneSlashIcon,
+	MinusIcon,
+	PauseIcon,
+	PlayIcon,
+	SquareIcon,
+	VideoCameraIcon,
+	VideoCameraSlashIcon,
+	XIcon,
+} from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useScopedT } from "@/contexts/I18nContext";
 import { Button } from "@/components/ui/button";
@@ -9,6 +20,10 @@ interface RecordingControlsProps {
 	paused: boolean;
 	microphoneEnabled: boolean;
 	elapsed: number;
+	showTeleprompter?: boolean;
+	onToggleTeleprompter?: () => void;
+	showWebcamPreview?: boolean;
+	onToggleWebcamPreview?: () => void;
 	onToggleMicrophone: () => void;
 	onPauseResume: () => void;
 	onStopRecording: () => void;
@@ -21,6 +36,10 @@ export const RecordingControls = ({
 	paused,
 	microphoneEnabled,
 	elapsed,
+	showTeleprompter,
+	onToggleTeleprompter,
+	showWebcamPreview,
+	onToggleWebcamPreview,
 	onToggleMicrophone,
 	onPauseResume,
 	onStopRecording,
@@ -106,6 +125,44 @@ export const RecordingControls = ({
 					<SquareIcon size={16} fill="currentColor" strokeWidth={0} />
 				</Button>
 
+				{onToggleWebcamPreview && (
+					<Button
+						variant="ghost"
+						size="icon"
+						iconSize="lg"
+						onClick={onToggleWebcamPreview}
+						title={
+							showWebcamPreview
+								? t("recording.hideFloatingWebcamPreview")
+								: t("recording.showFloatingWebcamPreview")
+						}
+						aria-label={
+							showWebcamPreview
+								? t("recording.hideFloatingWebcamPreview")
+								: t("recording.showFloatingWebcamPreview")
+						}
+						className={showWebcamPreview ? styles.ibActive : ""}
+					>
+						{showWebcamPreview ? (
+							<VideoCameraIcon size={18} />
+						) : (
+							<VideoCameraSlashIcon size={18} />
+						)}
+					</Button>
+				)}
+
+				<Button
+					variant="ghost"
+					size="icon"
+					iconSize="lg"
+					onClick={onToggleTeleprompter}
+					title={t("recording.teleprompterToggle", "Toggle teleprompter overlay")}
+					aria-label={t("recording.teleprompterToggle", "Toggle teleprompter overlay")}
+					className={showTeleprompter ? styles.ibActive : ""}
+				>
+					<ArticleIcon size={18} />
+				</Button>
+
 				<Button
 					variant="ghost"
 					size="icon"
@@ -133,6 +190,10 @@ export const RecordingControls = ({
 		paused,
 		microphoneEnabled,
 		elapsed,
+		showWebcamPreview,
+		onToggleWebcamPreview,
+		showTeleprompter,
+		onToggleTeleprompter,
 		onToggleMicrophone,
 		onPauseResume,
 		onStopRecording,

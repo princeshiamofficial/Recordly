@@ -20,6 +20,8 @@ import {
 	Sparkle,
 	ArrowCounterClockwise as Undo2,
 	UserCircle as User,
+	VideoCamera,
+	Lightning,
 	SpeakerLow as Volume1,
 	SpeakerHigh as Volume2,
 	SpeakerX as VolumeX,
@@ -176,10 +178,10 @@ import { getDevOpenRecordingConfig, getSmokeExportConfig } from "./smokeExportCo
 import { createSmokeExportProgressSampler } from "./smokeExportProgress";
 import {
 	APP_HEADER_ICON_BUTTON_CLASS,
-	DiscordLinkButton,
 	FeedbackDialog,
 	openExternalLink,
 	RECORDLY_ISSUES_URL,
+	TelegramLinkButton,
 } from "./TutorialHelp";
 import TimelineEditor, { type TimelineEditorHandle } from "./timeline/TimelineEditor";
 import {
@@ -5351,6 +5353,53 @@ export default function VideoEditor() {
 		handleExport,
 	]);
 
+	const handleInstantExport = useCallback(() => {
+		const video = videoPlaybackRef.current?.video;
+		if (!videoPath) {
+			toast.error("No video loaded");
+			return;
+		}
+		if (!video) {
+			toast.error("Video not ready");
+			return;
+		}
+
+		setExportEncodingMode("fast");
+		setExportPipelineModel("modern");
+
+		const sourceWidth = video.videoWidth || 1920;
+		const sourceHeight = video.videoHeight || 1080;
+		const settings = resolveExportStartSettings({
+			sourceWidth,
+			sourceHeight,
+			exportFormat: "mp4",
+			includeCaptionSidecar: hasCaptionsForSidecar && includeCaptionSidecar,
+			exportEncodingMode: "fast",
+			exportQuality,
+			mp4FrameRate,
+			exportBackendPreference: "auto",
+			exportPipelineModel: "modern",
+			gifFrameRate,
+			gifLoop,
+			gifSizePreset,
+		});
+
+		setExportError(null);
+		setExportedFilePath(undefined);
+		setShowExportDropdown(true);
+		handleExport(settings);
+	}, [
+		videoPath,
+		hasCaptionsForSidecar,
+		includeCaptionSidecar,
+		exportQuality,
+		mp4FrameRate,
+		gifFrameRate,
+		gifLoop,
+		gifSizePreset,
+		handleExport,
+	]);
+
 	const handleCancelExport = useCallback(() => {
 		if (exporterRef.current) {
 			exporterRef.current.cancel();
@@ -5827,7 +5876,7 @@ export default function VideoEditor() {
 					>
 						<FolderOpen className="h-4 w-4" />
 					</Button>
-					<DiscordLinkButton />
+					<TelegramLinkButton />
 					<FeedbackDialog />
 					<div className="ml-1 h-5 w-px bg-foreground/10" />
 					<Button
@@ -5851,6 +5900,31 @@ export default function VideoEditor() {
 						aria-label={t("common.actions.redo", "Redo")}
 					>
 						<Redo2 className="h-4 w-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						onClick={() => {
+							if (window.electronAPI?.hudOverlayShow) {
+								window.electronAPI.hudOverlayShow();
+							} else {
+								toast.info(
+									t(
+										"editor.header.recordNewWebNotice",
+										"Please use the Recordly Desktop App to start a new recording.",
+									),
+								);
+							}
+						}}
+						className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[5px] border border-red-500/25 bg-red-500/10 px-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+						title={t("editor.header.recordNew", "Record new")}
+						aria-label={t("editor.header.recordNew", "Record new")}
+					>
+						<span className="relative flex h-2 w-2">
+							<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+							<span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+						</span>
+						<VideoCamera className="h-4 w-4 text-red-500" />
 					</Button>
 				</div>
 				<div
@@ -6042,10 +6116,18 @@ export default function VideoEditor() {
 							</div>
 						</PopoverContent>
 					</Popover>
-					<div
-						aria-hidden="true"
-						className="mx-2 h-4 w-px shrink-0 bg-foreground/10 opacity-0"
-					/>
+					<Button
+						type="button"
+						onClick={handleInstantExport}
+						className="mr-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-[5px] bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white transition-all hover:opacity-90 shadow-sm"
+						title={t(
+							"editor.header.instantExportTitle",
+							"Instant export without delay",
+						)}
+					>
+						<Lightning className="h-3.5 w-3.5 fill-current text-yellow-300" />
+						<span>Instant Export</span>
+					</Button>
 					<DropdownMenu
 						open={showExportDropdown}
 						onOpenChange={setShowExportDropdown}
@@ -6254,6 +6336,7 @@ export default function VideoEditor() {
 									mp4OutputDimensions={mp4OutputDimensions}
 									gifOutputDimensions={gifOutputDimensions}
 									onExport={handleStartExportFromDropdown}
+									onInstantExport={handleInstantExport}
 									className="shadow-2xl"
 								/>
 							)}

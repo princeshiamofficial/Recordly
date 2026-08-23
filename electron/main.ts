@@ -30,10 +30,7 @@ import {
 import { ensureMediaServer } from "./mediaServer";
 import { shouldGrantDisplayCapture, shouldGrantMediaPermission } from "./permissionPolicy";
 import { ensurePackagedRendererServer, getPackagedRendererBaseUrl } from "./rendererServer";
-import {
-	hardenWebContentsNavigation,
-	shouldHardenWebContentsType,
-} from "./navigationPolicy";
+import { hardenWebContentsNavigation, shouldHardenWebContentsType } from "./navigationPolicy";
 import type { UpdateToastPayload } from "./updater";
 import {
 	checkForAppUpdates,

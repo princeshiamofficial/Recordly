@@ -18,7 +18,9 @@ describe("repairBundledUiohookBinaryForCurrentArch", () => {
 
 	afterEach(async () => {
 		await Promise.all(
-			tempRoots.splice(0).map((tempRoot) => fs.rm(tempRoot, { recursive: true, force: true })),
+			tempRoots
+				.splice(0)
+				.map((tempRoot) => fs.rm(tempRoot, { recursive: true, force: true })),
 		);
 	});
 
@@ -36,9 +38,14 @@ describe("repairBundledUiohookBinaryForCurrentArch", () => {
 
 		const log = vi.fn();
 		const repaired = repairBundledUiohookBinaryForCurrentArch(
-			Object.assign(new Error("mach-o file, but is an incompatible architecture (have 'x86_64', need 'arm64')"), {
-				code: "ERR_DLOPEN_FAILED",
-			}),
+			Object.assign(
+				new Error(
+					"mach-o file, but is an incompatible architecture (have 'x86_64', need 'arm64')",
+				),
+				{
+					code: "ERR_DLOPEN_FAILED",
+				},
+			),
 			{ packageRoot, platform: "darwin", arch: "arm64", log },
 		);
 

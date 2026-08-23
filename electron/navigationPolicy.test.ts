@@ -14,7 +14,8 @@ describe("normalizeExternalHttpUrl", () => {
 		["https://example.com/docs", "https://example.com/docs"],
 		["http://127.0.0.1:3000/path?q=1", "http://127.0.0.1:3000/path?q=1"],
 		["HTTPS://Example.COM:443/docs", "https://example.com/docs"],
-	])("normalizes an external HTTP(S) URL: %s", (value, expected) => {
+		["mailto:security@example.com", "mailto:security@example.com"],
+	])("normalizes an external HTTP(S) or mailto URL: %s", (value, expected) => {
 		expect(normalizeExternalHttpUrl(value)).toBe(expected);
 	});
 
@@ -24,7 +25,6 @@ describe("normalizeExternalHttpUrl", () => {
 		"file:///tmp/recordly.html",
 		"data:text/html,hello",
 		"javascript:alert(1)",
-		"mailto:security@example.com",
 		"https://user:password@example.com/",
 	])("rejects an unsafe external URL: %s", (value) => {
 		expect(normalizeExternalHttpUrl(value)).toBeNull();
@@ -224,7 +224,9 @@ describe("navigation event handlers", () => {
 
 		// history.replaceState() changes getURL() without crossing a document-navigation boundary.
 		currentUrl = "file:///opt/Recordly/dist/index.html?windowType=source-selector";
-		const willNavigate = on.mock.calls.find(([eventName]) => eventName === "will-navigate")?.[1];
+		const willNavigate = on.mock.calls.find(
+			([eventName]) => eventName === "will-navigate",
+		)?.[1];
 		if (typeof willNavigate !== "function") {
 			throw new Error("will-navigate handler was not registered");
 		}
@@ -250,7 +252,9 @@ describe("navigation event handlers", () => {
 		);
 
 		const didNavigate = on.mock.calls.find(([eventName]) => eventName === "did-navigate")?.[1];
-		const willNavigate = on.mock.calls.find(([eventName]) => eventName === "will-navigate")?.[1];
+		const willNavigate = on.mock.calls.find(
+			([eventName]) => eventName === "will-navigate",
+		)?.[1];
 		if (typeof didNavigate !== "function" || typeof willNavigate !== "function") {
 			throw new Error("navigation handlers were not registered");
 		}

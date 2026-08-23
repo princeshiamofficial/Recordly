@@ -15,6 +15,9 @@ export function shouldHardenWebContentsType(type: ReturnType<WebContents["getTyp
 export function normalizeExternalHttpUrl(value: string): string | null {
 	try {
 		const url = new URL(value);
+		if (url.protocol === "mailto:") {
+			return url.href;
+		}
 		if (
 			(url.protocol !== "http:" && url.protocol !== "https:") ||
 			!url.hostname ||

@@ -1,0 +1,221 @@
+.teleprompterContainer {
+	position: fixed;
+	top: 60px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 460px;
+	min-width: 320px;
+	max-width: 90vw;
+	height: 320px;
+	min-height: 200px;
+	max-height: 80vh;
+	resize: both;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	box-shadow:
+		0 20px 40px rgba(0, 0, 0, 0.4),
+		0 0 0 1px rgba(255, 255, 255, 0.05);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	z-index: 9999;
+	touch-action: none;
+	transition:
+		border-color 0.2s ease,
+		box-shadow 0.2s ease;
+	user-select: none;
+}
+
+.teleprompterHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	background: rgba(0, 0, 0, 0.35);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	cursor: grab;
+	shrink: 0;
+}
+
+.teleprompterHeader:active {
+	cursor: grabbing;
+}
+
+.headerTitleGroup {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+
+.headerActions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.contentArea {
+	position: relative;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.scrollArea {
+	flex: 1;
+	overflow-y: auto;
+	padding: 32px 24px;
+	scroll-behavior: smooth;
+}
+
+.scrollArea::-webkit-scrollbar {
+	width: 6px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.2);
+	border-radius: 3px;
+}
+
+.scriptText {
+	color: #ffffff;
+	font-weight: 600;
+	line-height: 1.6;
+	text-align: center;
+	white-space: pre-wrap;
+	word-break: break-word;
+	margin: 0;
+}
+
+.mirrored {
+	transform: scaleX(-1);
+}
+
+.focusLine {
+	position: absolute;
+	top: 50%;
+	left: 12px;
+	right: 12px;
+	height: 36px;
+	transform: translateY(-50%);
+	border-top: 1px dashed rgba(244, 63, 94, 0.4);
+	border-bottom: 1px dashed rgba(244, 63, 94, 0.4);
+	background: rgba(244, 63, 94, 0.05);
+	border-radius: 4px;
+	pointer-events: none;
+}
+
+.editTextarea {
+	width: 100%;
+	height: 100%;
+	padding: 16px;
+	background: transparent;
+	color: #ffffff;
+	border: none;
+	outline: none;
+	resize: none;
+	font-size: 14px;
+	line-height: 1.6;
+	font-family: inherit;
+}
+
+.editTextarea::placeholder {
+	color: rgba(255, 255, 255, 0.4);
+}
+
+.editFooter {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 16px;
+	background: rgba(0, 0, 0, 0.25);
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.settingsPanel {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: rgba(18, 18, 22, 0.95);
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	z-index: 10;
+	backdrop-filter: blur(12px);
+	box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.settingRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 12px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.settingLabel {
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.settingControl {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.rangeSlider {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 120px;
+	height: 4px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.2);
+	outline: none;
+}
+
+.rangeSlider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #ffffff;
+	cursor: pointer;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.rangeSlider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #ffffff;
+	cursor: pointer;
+	border: none;
+}
+
+.sliderValue {
+	font-family: monospace;
+	font-size: 11px;
+	min-width: 28px;
+	text-align: right;
+	color: rgba(255, 255, 255, 0.7);
+}
