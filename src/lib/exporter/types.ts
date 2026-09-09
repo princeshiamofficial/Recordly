@@ -9,6 +9,8 @@ export interface ExportConfig {
 	preferredRenderBackend?: ExportRenderBackend;
 	experimentalNativeExport?: boolean;
 	experimentalNvidiaCudaExport?: boolean;
+	cinematicLook?: CinematicLookPreset;
+	cinematicLetterbox?: boolean;
 	maxEncodeQueue?: number;
 	maxDecodeQueue?: number;
 	maxPendingFrames?: number;
@@ -172,7 +174,7 @@ export interface VideoFrameData {
 
 export type ExportEncodingMode = "fast" | "balanced" | "quality";
 
-export type ExportQuality = "medium" | "good" | "high" | "source";
+export type ExportQuality = "8k" | "4k" | "2k" | "high" | "good" | "medium" | "source";
 
 export type ExportMp4FrameRate = 24 | 30 | 60;
 
@@ -191,6 +193,42 @@ export interface GifExportConfig {
 	height: number;
 }
 
+export type CinematicLookPreset = "none" | "clean" | "cinematic" | "vibrant" | "film";
+
+export interface CinematicLookOption {
+	value: CinematicLookPreset;
+	label: string;
+	description: string;
+}
+
+export const CINEMATIC_LOOK_PRESETS: readonly CinematicLookOption[] = [
+	{
+		value: "none",
+		label: "None",
+		description: "Original video without color grading",
+	},
+	{
+		value: "clean",
+		label: "Clean Pro",
+		description: "Sharp text & subtle saturation boost for SaaS UI",
+	},
+	{
+		value: "cinematic",
+		label: "Teal & Orange",
+		description: "Hollywood-style cinematic grade with soft vignette",
+	},
+	{
+		value: "vibrant",
+		label: "Studio Vibrant",
+		description: "Rich contrast, vibrant colors and punchy blacks",
+	},
+	{
+		value: "film",
+		label: "Classic Film",
+		description: "Subtle film grain with nostalgic vintage tones",
+	},
+] as const;
+
 export interface ExportSettings {
 	format: ExportFormat;
 	includeCaptionSidecar?: boolean;
@@ -200,6 +238,8 @@ export interface ExportSettings {
 	mp4FrameRate?: ExportMp4FrameRate;
 	backendPreference?: ExportBackendPreference;
 	pipelineModel?: ExportPipelineModel;
+	cinematicLook?: CinematicLookPreset;
+	cinematicLetterbox?: boolean;
 	// GIF settings
 	gifConfig?: GifExportConfig;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CountdownOverlay } from "./components/countdown/CountdownOverlay";
+import Dashboard from "./components/dashboard/Dashboard";
 import { LaunchWindow } from "./components/launch/LaunchWindow";
 import { SourceSelector } from "./components/launch/SourceSelector";
 import { UpdateToastWindow } from "./components/launch/UpdateToastWindow";
@@ -14,7 +15,6 @@ export default function App() {
 	const [windowType, setWindowType] = useState("");
 	const { t } = useI18n();
 	const isMacOS = /mac/i.test(navigator.platform);
-	const appIconSrc = "/app-icons/recordly-128.png";
 
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
@@ -52,8 +52,8 @@ export default function App() {
 	useEffect(() => {
 		document.title =
 			windowType === "editor"
-				? t("app.editorTitle", "Recordly Editor")
-				: t("app.name", "Recordly");
+				? t("app.editorTitle", "CamVerse Editor")
+				: t("app.name", "CamVerse");
 	}, [windowType, t]);
 
 	switch (windowType) {
@@ -78,24 +78,6 @@ export default function App() {
 				</ShortcutsProvider>
 			);
 		default:
-			return (
-				<div className="flex h-full w-full items-center justify-center bg-editor-bg text-foreground">
-					<div className="flex items-center gap-4 rounded-2xl border border-foreground/10 bg-foreground/5 px-6 py-5 shadow-2xl shadow-black/30 backdrop-blur-xl">
-						<img
-							src={appIconSrc}
-							alt={t("app.name", "Recordly")}
-							className="h-12 w-12 rounded-xl"
-						/>
-						<div>
-							<h1 className="text-xl font-semibold tracking-tight">
-								{t("app.name", "Recordly")}
-							</h1>
-							<p className="text-sm text-foreground/65">
-								{t("app.subtitle", "Screen recording and editing")}
-							</p>
-						</div>
-					</div>
-				</div>
-			);
+			return <Dashboard />;
 	}
 }

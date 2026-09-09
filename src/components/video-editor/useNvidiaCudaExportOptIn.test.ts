@@ -62,7 +62,7 @@ describe("nvidiaCudaExportOptIn", () => {
 		expect(store.get(NVIDIA_CUDA_EXPORT_OPT_IN_SETTING_KEY)).toBe(false);
 	});
 
-	it("defaults to disabled when the app setting is unavailable", () => {
-		expect(loadInitialNvidiaCudaExportOptIn()).toBe(false);
+	it("defaults to enabled when the app setting is unavailable", () => {
+		expect(loadInitialNvidiaCudaExportOptIn()).toBe(true);
 	});
 });

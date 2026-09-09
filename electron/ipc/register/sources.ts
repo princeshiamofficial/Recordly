@@ -38,10 +38,12 @@ function broadcastSelectedSourceChange() {
 
 export function registerSourceHandlers({
 	createEditorWindow,
+	createDashboardWindow,
 	createSourceSelectorWindow,
 	getSourceSelectorWindow,
 }: {
 	createEditorWindow: () => void;
+	createDashboardWindow: () => void;
 	createSourceSelectorWindow: () => BrowserWindow;
 	getSourceSelectorWindow: () => BrowserWindow | null;
 }) {
@@ -540,5 +542,9 @@ body{background:transparent;overflow:hidden;width:100vw;height:100vh}
 			sourceSelectorWin.close();
 		}
 		createEditorWindow();
+	});
+	ipcMain.handle("switch-to-dashboard", () => {
+		console.log("[switch-to-dashboard] Opening dashboard window");
+		createDashboardWindow();
 	});
 }

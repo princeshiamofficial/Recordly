@@ -65,6 +65,7 @@
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
+	pointer-events: auto;
 }
 
 .scrollArea {
@@ -115,18 +116,66 @@
 	pointer-events: none;
 }
 
-.editTextarea {
-	width: 100%;
+.editContainer {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
 	height: 100%;
-	padding: 16px;
-	background: transparent;
+	min-height: 0;
+	padding: 12px 14px 8px 14px;
+	gap: 8px;
+	pointer-events: auto;
+}
+
+.editTitleRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
+.scriptTitleInput {
+	flex: 1;
+	background: rgba(255, 255, 255, 0.06);
 	color: #ffffff;
-	border: none;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
+	font-weight: 600;
+	outline: none;
+	user-select: text;
+	-webkit-user-select: text;
+	pointer-events: auto;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.scriptTitleInput:focus {
+	border-color: rgba(244, 63, 94, 0.6);
+	background: rgba(255, 255, 255, 0.09);
+}
+
+.scriptTitleInput::placeholder {
+	color: rgba(255, 255, 255, 0.35);
+}
+
+.editTextarea {
+	flex: 1;
+	width: 100%;
+	min-height: 0;
+	padding: 12px;
+	background: rgba(255, 255, 255, 0.05);
+	color: #ffffff;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 8px;
 	outline: none;
 	resize: none;
 	font-size: 14px;
 	line-height: 1.6;
 	font-family: inherit;
+	user-select: text;
+	-webkit-user-select: text;
+	pointer-events: auto;
 }
 
 .editTextarea::placeholder {

@@ -80,4 +80,33 @@ describe("exportTuning", () => {
 		expect(breezeHeavyProfile.maxDecodeQueue).toBe(8);
 		expect(breezeHeavyProfile.maxPendingFrames).toBe(16);
 	});
+
+	it("uses high-throughput queue and write limits in fast encoding mode", () => {
+		const breezeFastProfile = getExportBackpressureProfile({
+			encodeBackend: "ffmpeg",
+			width: 1920,
+			height: 1080,
+			frameRate: 60,
+			encodingMode: "fast",
+			hardwareConcurrency: 16,
+		});
+		const webCodecsFastProfile = getExportBackpressureProfile({
+			encodeBackend: "webcodecs",
+			width: 1920,
+			height: 1080,
+			frameRate: 60,
+			encodingMode: "fast",
+			hardwareConcurrency: 16,
+		});
+
+		expect(breezeFastProfile.name).toBe("breeze-fast-plus");
+		expect(breezeFastProfile.maxDecodeQueue).toBe(36);
+		expect(breezeFastProfile.maxPendingFrames).toBe(80);
+		expect(breezeFastProfile.maxInFlightNativeWrites).toBe(24);
+
+		expect(webCodecsFastProfile.name).toBe("webcodecs-fast-plus");
+		expect(webCodecsFastProfile.maxDecodeQueue).toBe(24);
+		expect(webCodecsFastProfile.maxPendingFrames).toBe(56);
+		expect(webCodecsFastProfile.maxInFlightNativeWrites).toBe(2);
+	});
 });

@@ -2,10 +2,12 @@ import {
 	ArrowCounterClockwiseIcon,
 	ArticleIcon,
 	CheckIcon,
+	CopyIcon,
 	GearIcon,
+	PauseIcon,
 	PencilSimpleIcon,
 	PlayIcon,
-	PauseIcon,
+	PlusIcon,
 	SparkleIcon,
 	TrashIcon,
 	XIcon,
@@ -17,11 +19,20 @@ import { useScopedT } from "@/contexts/I18nContext";
 import { HudInteractionContext } from "./contexts/HudInteractionContext";
 import styles from "./TeleprompterWidget.module.css";
 
-const STORAGE_KEY_TEXT = "recordly_teleprompter_text";
+const STORAGE_KEY_SCRIPTS = "recordly_teleprompter_scripts";
+const STORAGE_KEY_ACTIVE_ID = "recordly_teleprompter_active_id";
 const STORAGE_KEY_CONFIG = "recordly_teleprompter_config";
+const LEGACY_STORAGE_KEY_TEXT = "recordly_teleprompter_text";
 
 const DEFAULT_SAMPLE_SCRIPT =
-	"Welcome to Recordly!\n\nThis is your built-in teleprompter overlay.\n\n1. Type or paste your video script in Edit mode.\n2. Adjust font size, scroll speed, and opacity in Settings.\n3. Hit Play to auto-scroll while recording!\n\nYour teleprompter stays on screen for you, but is automatically hidden from your final screen recording!";
+	"Welcome to CamVerse!\n\nThis is your built-in teleprompter overlay.\n\n1. Type or paste your video script in Edit mode.\n2. Adjust font size, scroll speed, and opacity in Settings.\n3. Hit Play to auto-scroll while recording!\n\nYour teleprompter stays on screen for you, but is automatically hidden from your final screen recording!";
+
+interface TeleprompterScript {
+	id: string;
+	name: string;
+	text: string;
+	createdAt: number;
+}
 
 interface TeleprompterConfig {
 	fontSize: number;
@@ -48,10 +59,144 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 	const t = useScopedT("launch");
 	const hudContext = useContext(HudInteractionContext);
 
-	// Script & Config State
-	const [scriptText, setScriptText] = useState<string>(() => {
-		return localStorage.getItem(STORAGE_KEY_TEXT) ?? DEFAULT_SAMPLE_SCRIPT;
+	// Migrate legacy single-script storage to multi-script
+	const loadScripts = (): TeleprompterScript[] => {
+		try {
+			const saved = localStorage.getItem(STORAGE_KEY_SCRIPTS);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					return parsed;
+				}
+			}
+		} catch {
+			// Ignore parse errors
+		}
+		// Migrate from legacy single-script key
+		const legacyText = localStorage.getItem(LEGACY_STORAGE_KEY_TEXT);
+		const initial: TeleprompterScript[] = [
+			{
+				id: crypto.randomUUID(),
+				name: "My Script",
+				text: legacyText ?? DEFAULT_SAMPLE_SCRIPT,
+				createdAt: Date.now(),
+			},
+		];
+		try {
+			localStorage.setItem(STORAGE_KEY_SCRIPTS, JSON.stringify(initial));
+		} catch {
+			// Ignore storage write errors
+		}
+		return initial;
+	};
+
+	const [scripts, setScripts] = useState<TeleprompterScript[]>(loadScripts);
+	const [activeScriptId, setActiveScriptId] = useState<string>(() => {
+		const savedId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+		const loaded = loadScripts();
+		if (savedId && loaded.some((s) => s.id === savedId)) {
+			return savedId;
+		}
+		return loaded[0]?.id ?? "";
 	});
+
+	// Always guarantee activeScript resolves to a valid script
+	const activeScript: TeleprompterScript =
+		scripts.find((s) => s.id === activeScriptId) ??
+		scripts[0] ?? {
+			id: "default",
+			name: "My Script",
+			text: DEFAULT_SAMPLE_SCRIPT,
+			createdAt: Date.now(),
+		};
+
+	const activeScriptIdResolved = activeScript.id;
+	const scriptText = activeScript.text;
+	const scriptName = activeScript.name;
+
+	// Keep activeScriptId valid if the current ID is no longer in scripts
+	useEffect(() => {
+		if (scripts.length > 0 && !scripts.some((s) => s.id === activeScriptId)) {
+			setActiveScriptId(scripts[0].id);
+		}
+	}, [scripts, activeScriptId]);
+
+	const setScriptText = useCallback(
+		(text: string | ((prev: string) => string)) => {
+			const targetId = activeScriptIdResolved;
+			setScripts((prev) => {
+				const current = prev.find((s) => s.id === targetId);
+				const currentText = current?.text ?? "";
+				const resolved = typeof text === "function" ? text(currentText) : text;
+				return prev.map((s) => (s.id === targetId ? { ...s, text: resolved } : s));
+			});
+		},
+		[activeScriptIdResolved],
+	);
+
+	const setScriptName = useCallback(
+		(name: string) => {
+			const targetId = activeScriptIdResolved;
+			setScripts((prev) =>
+				prev.map((s) => (s.id === targetId ? { ...s, name } : s)),
+			);
+		},
+		[activeScriptIdResolved],
+	);
+
+	// Persist scripts to localStorage
+	useEffect(() => {
+		try {
+			localStorage.setItem(STORAGE_KEY_SCRIPTS, JSON.stringify(scripts));
+		} catch {
+			// Ignore storage write errors
+		}
+	}, [scripts]);
+
+	// Persist active script ID
+	useEffect(() => {
+		try {
+			localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeScriptId);
+		} catch {
+			// Ignore storage write errors
+		}
+	}, [activeScriptId]);
+
+	const addNewScript = useCallback(() => {
+		const newScript: TeleprompterScript = {
+			id: crypto.randomUUID(),
+			name: `Script ${scripts.length + 1}`,
+			text: "",
+			createdAt: Date.now(),
+		};
+		setScripts((prev) => [...prev, newScript]);
+		setActiveScriptId(newScript.id);
+		setMode("edit");
+	}, [scripts.length]);
+
+	const duplicateScript = useCallback(() => {
+		const newScript: TeleprompterScript = {
+			id: crypto.randomUUID(),
+			name: `${scriptName} (copy)`,
+			text: scriptText,
+			createdAt: Date.now(),
+		};
+		setScripts((prev) => [...prev, newScript]);
+		setActiveScriptId(newScript.id);
+		setMode("edit");
+	}, [scriptName, scriptText]);
+
+	const deleteScript = useCallback(
+		(id: string) => {
+			if (scripts.length <= 1) return;
+			const next = scripts.filter((s) => s.id !== id);
+			setScripts(next);
+			if (activeScriptId === id) {
+				setActiveScriptId(next[0]?.id ?? "");
+			}
+		},
+		[scripts, activeScriptId],
+	);
 
 	const [config, setConfig] = useState<TeleprompterConfig>(() => {
 		try {
@@ -80,11 +225,6 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 	// Scroll References
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const animFrameRef = useRef<number | null>(null);
-
-	// Save script text to localStorage
-	useEffect(() => {
-		localStorage.setItem(STORAGE_KEY_TEXT, scriptText);
-	}, [scriptText]);
 
 	// Save config to localStorage
 	useEffect(() => {
@@ -143,9 +283,17 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 		};
 	}, [isPlaying, mode, config.scrollSpeed]);
 
+	// Reset scroll to top and pause playback whenever active script changes
+	useEffect(() => {
+		if (scrollAreaRef.current) {
+			scrollAreaRef.current.scrollTop = 0;
+		}
+		setIsPlaying(false);
+	}, [activeScriptIdResolved]);
+
 	// Handle Dragging
 	const handlePointerDown = (e: React.PointerEvent) => {
-		if ((e.target as HTMLElement).closest("button, input, textarea")) return;
+		if ((e.target as HTMLElement).closest("button, input, textarea, select")) return;
 		isDraggingRef.current = true;
 		dragStartRef.current = {
 			x: e.clientX - offsetRef.current.x,
@@ -200,9 +348,31 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 				onPointerCancel={handlePointerUp}
 			>
 				<div className={styles.headerTitleGroup}>
-					<RxDragHandleDots2 size={16} className="text-white/40 cursor-grab" />
-					<ArticleIcon size={18} className="text-rose-500" />
-					<span>{t("recording.teleprompterTitle", "Teleprompter")}</span>
+					<RxDragHandleDots2 size={16} className="text-white/40 cursor-grab shrink-0" />
+					<ArticleIcon size={18} className="text-rose-500 shrink-0" />
+					<select
+						value={activeScriptIdResolved}
+						onChange={(e) => setActiveScriptId(e.target.value)}
+						className="bg-transparent text-white/90 text-[13px] font-semibold border-none outline-none cursor-pointer max-w-[140px] truncate"
+						style={{ userSelect: "text", WebkitUserSelect: "text" }}
+						title={scriptName}
+					>
+						{scripts.map((s) => (
+							<option key={s.id} value={s.id} className="bg-gray-900 text-white">
+								{s.name || t("recording.teleprompterUntitledScript", "Untitled Script")}
+							</option>
+						))}
+					</select>
+					<Button
+						variant="ghost"
+						size="icon"
+						iconSize="sm"
+						onClick={addNewScript}
+						title={t("recording.teleprompterNewScript", "New Script")}
+						className="h-6 w-6 text-white/60 hover:text-white"
+					>
+						<PlusIcon size={12} />
+					</Button>
 				</div>
 
 				<div className={styles.headerActions}>
@@ -297,11 +467,36 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 						<div className={styles.focusLine} />
 					</>
 				) : (
-					<>
+					<div className={styles.editContainer}>
+						<div className={styles.editTitleRow}>
+							<input
+								type="text"
+								value={scriptName}
+								onChange={(e) => setScriptName(e.target.value)}
+								onMouseMove={() => {
+									window.electronAPI?.hudOverlaySetIgnoreMouse?.(false);
+								}}
+								onFocus={() => {
+									window.electronAPI?.hudOverlaySetIgnoreMouse?.(false);
+								}}
+								placeholder={t(
+									"recording.teleprompterScriptTitlePlaceholder",
+									"Script Title",
+								)}
+								className={styles.scriptTitleInput}
+							/>
+						</div>
 						<textarea
+							autoFocus
 							className={styles.editTextarea}
 							value={scriptText}
 							onChange={(e) => setScriptText(e.target.value)}
+							onMouseMove={() => {
+								window.electronAPI?.hudOverlaySetIgnoreMouse?.(false);
+							}}
+							onFocus={() => {
+								window.electronAPI?.hudOverlaySetIgnoreMouse?.(false);
+							}}
 							placeholder={t(
 								"recording.teleprompterPlaceholder",
 								"Type or paste your script here...",
@@ -313,7 +508,40 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 									count: wordCount,
 								})}
 							</span>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									iconSize="sm"
+									onClick={addNewScript}
+									title={t("recording.teleprompterNewScript", "New Script")}
+									className="h-6 w-6 text-white/60 hover:text-white"
+								>
+									<PlusIcon size={12} />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									iconSize="sm"
+									onClick={duplicateScript}
+									title={t("recording.teleprompterDuplicateScript", "Duplicate Script")}
+									className="h-6 w-6 text-white/60 hover:text-white"
+								>
+									<CopyIcon size={12} />
+								</Button>
+								{scripts.length > 1 && (
+									<Button
+										variant="ghost"
+										size="icon"
+										iconSize="sm"
+										onClick={() => deleteScript(activeScriptIdResolved)}
+										title={t("recording.teleprompterDeleteScript", "Delete Script")}
+										className="h-6 w-6 text-rose-400/60 hover:text-rose-400"
+									>
+										<TrashIcon size={12} />
+									</Button>
+								)}
+								<div className="w-px h-3 bg-white/10 mx-0.5" />
 								<Button
 									variant="outline"
 									size="sm"
@@ -321,7 +549,7 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 									onClick={() => setScriptText(DEFAULT_SAMPLE_SCRIPT)}
 								>
 									<SparkleIcon size={12} className="mr-1 text-amber-400" />
-									{t("recording.teleprompterSampleScript", "Sample Script")}
+									{t("recording.teleprompterSampleScript", "Sample")}
 								</Button>
 								<Button
 									variant="ghost"
@@ -334,7 +562,7 @@ export function TeleprompterWidget({ onClose, recordingActive }: TeleprompterWid
 								</Button>
 							</div>
 						</div>
-					</>
+					</div>
 				)}
 
 				{/* Settings Drawer */}

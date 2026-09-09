@@ -256,3 +256,56 @@ export function parseFfmpegDurationSeconds(stderr: string): number | null {
 
 	return hours * 3600 + minutes * 60 + seconds;
 }
+
+export function buildCinematicVideoFilter(
+	look?: string | null,
+	letterbox?: boolean | null,
+): string | null {
+	const filters: string[] = [];
+
+	switch (look) {
+		case "clean":
+			// Sharp text + subtle saturation boost for SaaS UI
+			filters.push("unsharp=3:3:0.4:3:3:0.0", "eq=contrast=1.04:saturation=1.08");
+			break;
+		case "cinematic":
+			// Hollywood Teal & Orange + gentle vignette
+			filters.push(
+				"curves=r='0/0 0.5/0.56 1/1':b='0/0.04 0.5/0.46 1/0.96'",
+				"eq=contrast=1.08:saturation=1.12",
+				"vignette=PI/7",
+			);
+			break;
+		case "vibrant":
+			// Studio punchy colors and deep contrast
+			filters.push(
+				"eq=contrast=1.12:saturation=1.25:gamma=1.02",
+				"unsharp=3:3:0.5:3:3:0.0",
+			);
+			break;
+		case "film":
+			// Classic Film: gentle warm curve, lower saturation, fine grain, subtle vignette
+			filters.push(
+				"curves=r='0/0.03 0.5/0.5 1/0.95':b='0/0.05 0.5/0.45 1/0.85'",
+				"eq=contrast=1.05:saturation=0.88",
+				"noise=alls=3:allf=t+u",
+				"vignette=PI/6",
+			);
+			break;
+		case "none":
+		default:
+			break;
+	}
+
+	if (letterbox) {
+		// 21:9 Aspect Ratio letterbox bars on top and bottom (12.5% height each)
+		// Leaves a 2.37:1 widescreen viewing center without altering output dimensions
+		filters.push(
+			"drawbox=x=0:y=0:w=iw:h=trunc(ih*0.125):color=black:t=fill",
+			"drawbox=x=0:y=ih-trunc(ih*0.125):w=iw:h=trunc(ih*0.125):color=black:t=fill",
+		);
+	}
+
+	return filters.length > 0 ? filters.join(",") : null;
+}
+

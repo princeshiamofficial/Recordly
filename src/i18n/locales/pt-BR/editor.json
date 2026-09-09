@@ -44,7 +44,6 @@
 		"solidColor": "Cor sólida (censura)",
 		"borderRadius": "Raio da borda"
 	},
-
 	"fontStyles": {
 		"classic": "Classic",
 		"editor": "Editor",
@@ -115,7 +114,7 @@
 	},
 	"nativeCaptureUnavailable": {
 		"title": "Nada está quebrado, mas não poderemos renderizar uma sobreposição animada do cursor.",
-		"description": "Seu dispositivo não oferece suporte à captura nativa. Isso pode acontecer por vários motivos que ainda não identificamos. O Recordly continuará funcionando, mas a suavização do cursor ficará indisponível.",
+		"description": "Seu dispositivo não oferece suporte à captura nativa. Isso pode acontecer por vários motivos que ainda não identificamos. O CamVerse continuará funcionando, mas a suavização do cursor ficará indisponível.",
 		"confirm": "Entendi"
 	},
 	"exportStatus": {

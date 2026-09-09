@@ -85,7 +85,7 @@
 		"connectedZoomDuration": "Dauer bei verbundenem Zoom",
 		"connectedZoomEasing": "Kurve für verbundenen Schwenk",
 		"zoomEasingOptions": {
-			"recordly": "Recordly",
+			"recordly": "CamVerse",
 			"glide": "Glide",
 			"smooth": "Smooth",
 			"snappy": "Snappy",

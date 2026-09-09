@@ -906,6 +906,8 @@ export class VideoExporter {
 							: undefined,
 					editedAudioData: editedAudioBuffer,
 					editedAudioMimeType,
+					cinematicLook: this.config.cinematicLook,
+					cinematicLetterbox: this.config.cinematicLetterbox,
 				}),
 				"native export finalization",
 				audioPlan.audioMode === "none" ? "default" : "audio",
@@ -1000,6 +1002,8 @@ export class VideoExporter {
 			outputDurationSec: this.effectiveDurationSec,
 			editedAudioData: editedAudioBuffer,
 			editedAudioMimeType,
+			cinematicLook: this.config.cinematicLook,
+			cinematicLetterbox: this.config.cinematicLetterbox,
 		};
 
 		if (videoSource.mode === "stream") {

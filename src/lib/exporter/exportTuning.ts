@@ -1,6 +1,6 @@
 import type { ExportEncodeBackend, ExportEncodingMode } from "./types";
 
-const DEFAULT_ENCODING_MODE: ExportEncodingMode = "fast";
+const DEFAULT_ENCODING_MODE: ExportEncodingMode = "quality";
 type WebCodecsLatencyMode = "quality" | "realtime";
 const BASELINE_PIXELS_PER_SECOND = 1280 * 720 * 60;
 
@@ -125,7 +125,39 @@ export function getExportBackpressureProfile(
 	const isExtremeWorkload = relativePixelRate >= 3;
 	const maxEncodeQueue = getWebCodecsEncodeQueueLimit(options.frameRate, options.encodingMode);
 
+	const isFastMode = options.encodingMode === "fast";
+
 	if (options.encodeBackend === "ffmpeg") {
+		if (isFastMode) {
+			if (isLowCoreSystem || isExtremeWorkload) {
+				return {
+					name: "breeze-fast-conservative",
+					maxEncodeQueue,
+					maxDecodeQueue: 16,
+					maxPendingFrames: 36,
+					maxInFlightNativeWrites: 8,
+				};
+			}
+
+			if (isHighCoreSystem && !isExtremeWorkload) {
+				return {
+					name: "breeze-fast-plus",
+					maxEncodeQueue,
+					maxDecodeQueue: 36,
+					maxPendingFrames: 80,
+					maxInFlightNativeWrites: 24,
+				};
+			}
+
+			return {
+				name: "breeze-fast",
+				maxEncodeQueue,
+				maxDecodeQueue: 24,
+				maxPendingFrames: 56,
+				maxInFlightNativeWrites: 16,
+			};
+		}
+
 		if (isLowCoreSystem || isExtremeWorkload) {
 			return {
 				name: "breeze-conservative",
@@ -152,6 +184,36 @@ export function getExportBackpressureProfile(
 			maxDecodeQueue: 12,
 			maxPendingFrames: 28,
 			maxInFlightNativeWrites: 4,
+		};
+	}
+
+	if (isFastMode) {
+		if (isLowCoreSystem || isExtremeWorkload) {
+			return {
+				name: "webcodecs-fast-conservative",
+				maxEncodeQueue,
+				maxDecodeQueue: 14,
+				maxPendingFrames: 28,
+				maxInFlightNativeWrites: 1,
+			};
+		}
+
+		if (isHighCoreSystem && !isExtremeWorkload) {
+			return {
+				name: "webcodecs-fast-plus",
+				maxEncodeQueue,
+				maxDecodeQueue: 24,
+				maxPendingFrames: 56,
+				maxInFlightNativeWrites: 2,
+			};
+		}
+
+		return {
+			name: "webcodecs-fast",
+			maxEncodeQueue,
+			maxDecodeQueue: 18,
+			maxPendingFrames: 40,
+			maxInFlightNativeWrites: 1,
 		};
 	}
 

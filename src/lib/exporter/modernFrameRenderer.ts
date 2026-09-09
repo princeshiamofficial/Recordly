@@ -675,6 +675,7 @@ export class FrameRenderer {
 			autoStart: false,
 			sharedTicker: false,
 			powerPreference: "high-performance" as const,
+			preserveDrawingBuffer: true,
 		};
 
 		const preferredRenderBackend = this.config.preferredRenderBackend;
@@ -924,7 +925,7 @@ export class FrameRenderer {
 		fallbackWidth: number,
 		fallbackHeight: number,
 	): Promise<CanvasImageSource | VideoFrame> {
-		if (this.rendererBackend !== "webgpu" || typeof createImageBitmap !== "function") {
+		if (typeof createImageBitmap !== "function") {
 			return this.stageVideoFrameForTexture(frame, kind, fallbackWidth, fallbackHeight);
 		}
 

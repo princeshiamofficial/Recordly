@@ -223,6 +223,7 @@ interface Window {
 		getAssetBasePath: () => Promise<string | null>;
 		getSources: (opts: Electron.SourcesOptions) => Promise<ProcessedDesktopSource[]>;
 		switchToEditor: () => Promise<void>;
+		switchToDashboard: () => Promise<void>;
 		openSourceSelector: () => Promise<void>;
 		selectSource: (source: ProcessedDesktopSource) => Promise<ProcessedDesktopSource>;
 		showSourceHighlight: (source: ProcessedDesktopSource) => Promise<{ success: boolean }>;
@@ -237,6 +238,7 @@ interface Window {
 				capturesMicrophone?: boolean;
 				microphoneDeviceId?: string;
 				microphoneLabel?: string;
+				recordingQuality?: number;
 			},
 		) => Promise<{
 			success: boolean;
@@ -351,6 +353,17 @@ interface Window {
 			capabilities?: RendererNativeExportCapabilities;
 			error?: string;
 		}>;
+		getDetectedEncoderInfo: () => Promise<{
+			success: boolean;
+			info?: {
+				encoderName: string;
+				isHardware: boolean;
+				displayName: string;
+				gpuModel?: string;
+				platform: string;
+			};
+			error?: string;
+		}>;
 		nativeStaticLayoutExport: (options: {
 			sessionId?: string;
 			inputPath: string;
@@ -444,6 +457,7 @@ interface Window {
 			bitrate: number;
 			encodingMode: "fast" | "balanced" | "quality";
 			inputMode?: "rawvideo" | "h264-stream";
+			vflip?: boolean;
 		}) => Promise<{
 			success: boolean;
 			sessionId?: string;
@@ -471,6 +485,8 @@ interface Window {
 				editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 				editedAudioData?: ArrayBuffer;
 				editedAudioMimeType?: string | null;
+				cinematicLook?: string | null;
+				cinematicLetterbox?: boolean | null;
 			},
 		) => Promise<{
 			success: boolean;
@@ -495,6 +511,8 @@ interface Window {
 				editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 				editedAudioData?: ArrayBuffer;
 				editedAudioMimeType?: string | null;
+				cinematicLook?: string | null;
+				cinematicLetterbox?: boolean | null;
 			},
 		) => Promise<{
 			success: boolean;
@@ -515,6 +533,8 @@ interface Window {
 				editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 				editedAudioData?: ArrayBuffer;
 				editedAudioMimeType?: string | null;
+				cinematicLook?: string | null;
+				cinematicLetterbox?: boolean | null;
 			},
 		) => Promise<{
 			success: boolean;
@@ -883,6 +903,7 @@ interface Window {
 			microphoneEnabled: boolean;
 			microphoneDeviceId?: string;
 			systemAudioEnabled: boolean;
+			recordingQuality: number;
 		}>;
 		getRecordingAudioLabConfig: () => Promise<{
 			browserMicrophoneProfile: string;
@@ -892,6 +913,7 @@ interface Window {
 			microphoneEnabled?: boolean;
 			microphoneDeviceId?: string;
 			systemAudioEnabled?: boolean;
+			recordingQuality?: number;
 		}) => Promise<{ success: boolean; error?: string }>;
 		/** Countdown timer before recording */
 		getCountdownDelay: () => Promise<{ success: boolean; delay: number }>;

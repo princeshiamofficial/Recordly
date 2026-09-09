@@ -44,7 +44,6 @@
 		"solidColor": "Colore pieno (Censura)",
 		"borderRadius": "Raggio bordo"
 	},
-
 	"fontStyles": {
 		"classic": "Classico",
 		"editor": "Editor",
@@ -115,7 +114,7 @@
 	},
 	"nativeCaptureUnavailable": {
 		"title": "Niente è rotto, ma non sarà possibile renderizzare un overlay del cursore animato.",
-		"description": "Il tuo dispositivo non supporta la cattura nativa. Le cause possono essere varie e non ancora identificate. Recordly funziona comunque, ma non è possibile applicare lo smoothing del cursore.",
+		"description": "Il tuo dispositivo non supporta la cattura nativa. Le cause possono essere varie e non ancora identificate. CamVerse funziona comunque, ma non è possibile applicare lo smoothing del cursore.",
 		"confirm": "Ok"
 	},
 	"exportStatus": {

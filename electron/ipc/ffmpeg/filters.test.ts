@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	appendSyncedAudioFilter,
 	applyRecordedAudioStartDelay,
+	buildCinematicVideoFilter,
 	getAudioSyncAdjustment,
 } from "./filters";
 
@@ -162,3 +163,49 @@ describe("applyRecordedAudioStartDelay", () => {
 		});
 	});
 });
+
+describe("buildCinematicVideoFilter", () => {
+	it("returns null for 'none' look without letterbox", () => {
+		expect(buildCinematicVideoFilter("none", false)).toBeNull();
+		expect(buildCinematicVideoFilter(undefined, undefined)).toBeNull();
+	});
+
+	it("builds the clean pro look filter", () => {
+		const filter = buildCinematicVideoFilter("clean", false);
+		expect(filter).toContain("unsharp=3:3:0.4");
+		expect(filter).toContain("eq=contrast=1.04:saturation=1.08");
+	});
+
+	it("builds the teal and orange cinematic filter", () => {
+		const filter = buildCinematicVideoFilter("cinematic", false);
+		expect(filter).toContain("curves=r='0/0 0.5/0.56 1/1'");
+		expect(filter).toContain("vignette=PI/7");
+	});
+
+	it("builds the studio vibrant filter", () => {
+		const filter = buildCinematicVideoFilter("vibrant", false);
+		expect(filter).toContain("eq=contrast=1.12:saturation=1.25");
+	});
+
+	it("builds the classic film filter with fine grain", () => {
+		const filter = buildCinematicVideoFilter("film", false);
+		expect(filter).toContain("noise=alls=3:allf=t+u");
+		expect(filter).toContain("vignette=PI/6");
+	});
+
+	it("appends 21:9 letterbox drawbox filters when letterbox is enabled", () => {
+		const filter = buildCinematicVideoFilter("clean", true);
+		expect(filter).toContain("drawbox=x=0:y=0:w=iw:h=trunc(ih*0.125):color=black:t=fill");
+		expect(filter).toContain(
+			"drawbox=x=0:y=ih-trunc(ih*0.125):w=iw:h=trunc(ih*0.125):color=black:t=fill",
+		);
+	});
+
+	it("supports letterbox only without any color grade look", () => {
+		const filter = buildCinematicVideoFilter("none", true);
+		expect(filter).toBe(
+			"drawbox=x=0:y=0:w=iw:h=trunc(ih*0.125):color=black:t=fill,drawbox=x=0:y=ih-trunc(ih*0.125):w=iw:h=trunc(ih*0.125):color=black:t=fill",
+		);
+	});
+});
+

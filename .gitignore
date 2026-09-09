@@ -24,8 +24,14 @@ dist-ssr
 *.sln
 *.sw?
 release/**
+release-build/**
+dist-release/**
+dist-build/**
+install/**
+.freebuff/
+.gemini/
+.playwright-mcp/
 *.kiro/
-# npx electron-builder --mac --win
 .tmp/
 .history/
 extension-sources/

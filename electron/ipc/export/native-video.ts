@@ -19,6 +19,7 @@ import type {
 	NativeVideoExportFinishOptions,
 } from "../nativeVideoExport";
 import {
+	buildCinematicVideoFilter,
 	buildEditedTrackSourceAudioFilter,
 	buildNativeConcatArgs,
 	buildNativeCudaOverlayStaticLayoutArgs,
@@ -1200,8 +1201,8 @@ export function validateNativeStaticLayoutSourceProxyMetadata(
 }
 
 export function getNativeVideoExportMaxQueuedWriteBytes(inputByteSize: number) {
-	if (inputByteSize === 0) return 8 * 1024 * 1024;
-	return Math.min(64 * 1024 * 1024, Math.max(16 * 1024 * 1024, inputByteSize * 4));
+	if (inputByteSize === 0) return 16 * 1024 * 1024;
+	return Math.min(256 * 1024 * 1024, Math.max(32 * 1024 * 1024, inputByteSize * 24));
 }
 
 async function runFfmpegWithMetrics(
@@ -1978,12 +1979,12 @@ function isExplicitNvidiaCudaExportDisabled() {
 	return process.env[NVIDIA_CUDA_EXPORT_ENV] === "0";
 }
 
-function isUserOptedInNvidiaCudaExport(options: NativeStaticLayoutExportOptions) {
-	return options.experimentalNvidiaCudaExport === true && !isExplicitNvidiaCudaExportDisabled();
-}
-
-function isValidatedNvidiaCudaFallbackCandidate(options: NativeStaticLayoutExportOptions) {
-	return isUserOptedInNvidiaCudaExport(options) && !isExplicitNvidiaCudaExportEnabled();
+// In auto modes (default or user opt-in) the CUDA compositor is a validated
+// candidate: it may run video-only and rely on the shared audio mux validation
+// path. Explicit lab launches must opt into that path with
+// RECORDLY_NVIDIA_CUDA_FORCE_VIDEO_ONLY=1.
+function isValidatedNvidiaCudaFallbackCandidate() {
+	return !isExplicitNvidiaCudaExportEnabled();
 }
 
 function isNvidiaCudaForceVideoOnlyEnabled() {
@@ -2031,16 +2032,16 @@ export async function getExperimentalNvidiaCudaExportSkipReason(
 	if (isExplicitNvidiaCudaExportDisabled()) {
 		return "env-disabled";
 	}
-	const explicitCuda = isExplicitNvidiaCudaExportEnabled();
-	const userOptIn = isUserOptedInNvidiaCudaExport(options);
-	if (!explicitCuda && !userOptIn) {
-		return "env-disabled";
-	}
 	if (!options.experimentalWindowsGpuCompositor) {
 		return "windows-gpu-compositor-disabled";
 	}
 
-	if (userOptIn) {
+	// The CUDA compositor is the default Windows static-layout route. The
+	// wrapper and NVIDIA GPU are probed in auto modes; explicit lab launches
+	// (RECORDLY_EXPERIMENTAL_NVIDIA_CUDA_EXPORT=1) skip the probe and trust the
+	// caller.
+	const explicitCuda = isExplicitNvidiaCudaExportEnabled();
+	if (!explicitCuda) {
 		if (!(await resolveExperimentalNvidiaCudaExportScriptPath())) {
 			return "cuda-wrapper-unavailable";
 		}
@@ -2051,7 +2052,7 @@ export async function getExperimentalNvidiaCudaExportSkipReason(
 
 	return getNvidiaCudaAudioExportSkipReason(options.audioOptions?.audioMode, {
 		allowValidatedFallbackCandidate:
-			isValidatedNvidiaCudaFallbackCandidate(options) || isNvidiaCudaForceVideoOnlyEnabled(),
+			isValidatedNvidiaCudaFallbackCandidate() || isNvidiaCudaForceVideoOnlyEnabled(),
 	});
 }
 
@@ -2094,7 +2095,7 @@ export async function getNativeExportCapabilities(): Promise<NativeExportCapabil
 			hasWrapper: Boolean(wrapperPath),
 			explicitEnabled,
 			explicitDisabled,
-			userOptInRequired: !explicitEnabled,
+			userOptInRequired: skipReason !== null,
 		},
 	};
 }
@@ -2818,7 +2819,7 @@ async function runExperimentalNvidiaCudaStaticLayoutExport(
 	const startedAtIso = new Date().toISOString();
 	const timeoutMs = Math.max(20 * 60 * 1000, options.durationSec * 2000);
 	const stallTimeoutMs = getNvidiaCudaAutoStallTimeoutMs(
-		isValidatedNvidiaCudaFallbackCandidate(options),
+		isValidatedNvidiaCudaFallbackCandidate(),
 	);
 	const ffmpegDirectory = path.dirname(ffmpegPath);
 	const pathKey = process.platform === "win32" ? "Path" : "PATH";
@@ -3376,8 +3377,7 @@ export async function exportNativeStaticLayoutVideo(
 				const nvidiaCudaSkipReason =
 					await getExperimentalNvidiaCudaExportSkipReason(options);
 				let shouldTryNvidiaCuda = nvidiaCudaSkipReason === null;
-				const validatedCudaFallbackCandidate =
-					isValidatedNvidiaCudaFallbackCandidate(options);
+				const validatedCudaFallbackCandidate = isValidatedNvidiaCudaFallbackCandidate();
 				if (
 					shouldTryNvidiaCuda &&
 					(validatedCudaFallbackCandidate || isNvidiaCudaForceVideoOnlyEnabled()) &&
@@ -3995,6 +3995,7 @@ export function buildNativeVideoAudioMuxArgs(
 	argsOptions: NativeVideoAudioMuxArgsOptions = {},
 ) {
 	const audioMode = options.audioMode ?? "none";
+	const hasAudio = Boolean(audioInputPath && audioMode !== "none");
 	const useEditedTrackFiltergraph =
 		audioMode === "edited-track" && options.editedTrackStrategy === "filtergraph-fast-path";
 	const args = ["-y", "-hide_banner", "-loglevel", "error"];
@@ -4007,16 +4008,19 @@ export function buildNativeVideoAudioMuxArgs(
 			"-nostats",
 		);
 	}
-	args.push("-i", videoPath, "-i", audioInputPath);
+	args.push("-i", videoPath);
+	if (hasAudio) {
+		args.push("-i", audioInputPath);
+	}
 
-	if (audioMode === "trim-source") {
+	if (hasAudio && audioMode === "trim-source") {
 		const filter = buildTrimmedSourceAudioFilter(options.trimSegments ?? []);
 		if (filter) {
 			args.push("-filter_complex", filter, "-map", "0:v:0", "-map", "[aout]");
 		} else {
 			args.push("-map", "0:v:0", "-map", "1:a:0");
 		}
-	} else if (useEditedTrackFiltergraph) {
+	} else if (hasAudio && useEditedTrackFiltergraph) {
 		const filter = buildEditedTrackSourceAudioFilter(
 			options.editedTrackSegments ?? [],
 			options.audioSourceSampleRate ?? 0,
@@ -4041,23 +4045,51 @@ export function buildNativeVideoAudioMuxArgs(
 		} else {
 			args.push("-filter_complex", filter, "-map", "0:v:0", "-map", "[aout]");
 		}
-	} else {
+	} else if (hasAudio) {
 		args.push("-map", "0:v:0", "-map", "1:a:0");
+	} else {
+		args.push("-map", "0:v:0", "-an");
 	}
 
-	args.push("-c:v", "copy");
-	if (audioMode === "copy-source" && canCopyAudioCodecIntoMp4(options.audioSourceCodec)) {
-		args.push("-c:a", "copy");
+	const cinematicFilter = buildCinematicVideoFilter(
+		options.cinematicLook,
+		options.cinematicLetterbox,
+	);
+
+	if (cinematicFilter) {
+		args.push(
+			"-vf",
+			cinematicFilter,
+			"-c:v",
+			"libx264",
+			"-preset",
+			"veryfast",
+			"-crf",
+			"18",
+			"-threads",
+			"0",
+			"-pix_fmt",
+			"yuv420p",
+		);
 	} else {
-		args.push("-c:a", "aac", "-b:a", "192k");
+		args.push("-c:v", "copy");
 	}
+
+	if (hasAudio) {
+		if (audioMode === "copy-source" && canCopyAudioCodecIntoMp4(options.audioSourceCodec)) {
+			args.push("-c:a", "copy");
+		} else {
+			args.push("-c:a", "aac", "-b:a", "192k");
+		}
+	}
+
 	if (
 		typeof options.outputDurationSec === "number" &&
 		Number.isFinite(options.outputDurationSec) &&
 		options.outputDurationSec > 0
 	) {
 		args.push("-t", formatFfmpegSeconds(options.outputDurationSec * 1000));
-	} else if (audioMode !== "copy-source") {
+	} else if (hasAudio && audioMode !== "copy-source") {
 		args.push("-shortest");
 	}
 	args.push("-movflags", "+faststart", outputPath);
@@ -4072,7 +4104,10 @@ export async function muxNativeVideoExportAudio(
 	session?: NativeStaticLayoutExportSession,
 ) {
 	const audioMode = options.audioMode ?? "none";
-	if (audioMode === "none") {
+	const hasCinematicFilter = Boolean(
+		(options.cinematicLook && options.cinematicLook !== "none") || options.cinematicLetterbox,
+	);
+	if (audioMode === "none" && !hasCinematicFilter) {
 		return {
 			outputPath: videoPath,
 			metrics: {} as NativeVideoAudioMuxMetrics,
@@ -4103,7 +4138,7 @@ export async function muxNativeVideoExportAudio(
 		tempArtifacts.push(audioInputPath);
 	}
 
-	if (!audioInputPath) {
+	if (!audioInputPath && !hasCinematicFilter) {
 		return {
 			outputPath: videoPath,
 			metrics,
@@ -4117,7 +4152,7 @@ export async function muxNativeVideoExportAudio(
 
 	const args = buildNativeVideoAudioMuxArgs(
 		videoPath,
-		audioInputPath,
+		audioInputPath ?? "",
 		outputPath,
 		options,
 		onProgress ? { progressPipe: 2 } : {},

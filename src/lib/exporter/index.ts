@@ -14,6 +14,8 @@ export {
 export { VideoMuxer } from "./muxer";
 export { StreamingVideoDecoder } from "./streamingDecoder";
 export type {
+	CinematicLookOption,
+	CinematicLookPreset,
 	ExportBackendPreference,
 	ExportConfig,
 	ExportEncodeBackend,
@@ -33,6 +35,7 @@ export type {
 	VideoFrameData,
 } from "./types";
 export {
+	CINEMATIC_LOOK_PRESETS,
 	GIF_FRAME_RATES,
 	GIF_SIZE_PRESETS,
 	isValidGifFrameRate,

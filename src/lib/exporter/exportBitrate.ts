@@ -7,7 +7,7 @@ const REFERENCE_FRAME_RATE = 30;
 export function getEncodingModeBitrateMultiplier(encodingMode: ExportEncodingMode): number {
 	switch (encodingMode) {
 		case "fast":
-			return 0.1;
+			return 0.45;
 		case "quality":
 			return 1;
 		case "balanced":
@@ -18,6 +18,9 @@ export function getEncodingModeBitrateMultiplier(encodingMode: ExportEncodingMod
 
 export function getSourceQualityBitrate(width: number, height: number): number {
 	const totalPixels = width * height;
+	if (totalPixels > 3840 * 2160) {
+		return 120_000_000;
+	}
 	if (totalPixels > 2560 * 1440) {
 		return 80_000_000;
 	}
@@ -28,6 +31,15 @@ export function getSourceQualityBitrate(width: number, height: number): number {
 }
 
 function getBaseMp4ExportBitrate(width: number, height: number, quality: ExportQuality): number {
+	if (quality === "8k") {
+		return 120_000_000;
+	}
+	if (quality === "4k") {
+		return 80_000_000;
+	}
+	if (quality === "2k") {
+		return 50_000_000;
+	}
 	if (quality === "source") {
 		return getSourceQualityBitrate(width, height);
 	}
@@ -39,7 +51,13 @@ function getBaseMp4ExportBitrate(width: number, height: number, quality: ExportQ
 	if (totalPixels <= 1920 * 1080) {
 		return 20_000_000;
 	}
-	return 30_000_000;
+	if (totalPixels <= 2560 * 1440) {
+		return 50_000_000;
+	}
+	if (totalPixels <= 3840 * 2160) {
+		return 80_000_000;
+	}
+	return 120_000_000;
 }
 
 function getFrameRateBitrateMultiplier(frameRate: ExportMp4FrameRate): number {

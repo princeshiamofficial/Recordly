@@ -41,6 +41,7 @@ struct CaptureConfig {
     bool hasDisplayBounds = false;
     bool captureSystemAudio = false;
     bool captureMic = false;
+    int quality = 2;  // 1=Low, 2=Medium, 3=High, 4=Ultra, 5=PixelPerfect
 };
 
 static bool parseSimpleJson(const std::string& json, CaptureConfig& config) {
@@ -144,6 +145,9 @@ static bool parseSimpleJson(const std::string& json, CaptureConfig& config) {
         config.displayH = dh;
         config.hasDisplayBounds = true;
     }
+
+    int quality = findInt("quality");
+    if (quality >= 1 && quality <= 5) config.quality = quality;
 
     return true;
 }
@@ -329,7 +333,7 @@ int main(int argc, char* argv[]) {
     MFEncoder encoder;
     std::wstring outputPathW = utf8ToWide(config.outputPath);
     if (!encoder.initialize(outputPathW, captureWidth, captureHeight, config.fps,
-                           session.device(), session.context())) {
+                           session.device(), session.context(), config.quality)) {
         std::cerr << "ERROR: Failed to initialize Media Foundation encoder" << std::endl;
         return 1;
     }

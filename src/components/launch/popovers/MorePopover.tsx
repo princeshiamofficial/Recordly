@@ -125,6 +125,16 @@ export function MorePopover({
 				</DropdownItem>
 			) : null}
 			<div className={styles.ddLabel} style={{ marginTop: 4 }}>
+				{t("recording.resolution", "Recording Resolution")}
+			</div>
+			<DropdownItem
+				icon={<DesktopIcon size={16} />}
+				selected
+				onClick={() => requestClose(POPOVER_ID)}
+			>
+				Native Display
+			</DropdownItem>
+			<div className={styles.ddLabel} style={{ marginTop: 4 }}>
 				{t("recording.appearance", "Appearance")}
 			</div>
 			<DropdownItem

@@ -6,12 +6,6 @@ import type { Readable, Writable } from "node:stream";
 import type { SaveDialogOptions } from "electron";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import {
-	parseCaptionSidecarPayload,
-	type CaptionSidecarPayload,
-	withCaptionSidecarMessage,
-	writeCaptionSidecarsBestEffort,
-} from "./exportCaptionSidecars";
-import {
 	closeExportStream,
 	isOwnedExportPath,
 	openExportStream,
@@ -19,6 +13,7 @@ import {
 	releaseOwnedExportPath,
 	writeToExportStream,
 } from "../export/exportStream";
+import { detectSystemEncoderInfo } from "../export/gpuDetector";
 import {
 	enqueueNativeVideoExportFrameWrite,
 	enqueueNativeVideoExportFrameWrites,
@@ -51,6 +46,12 @@ import {
 } from "../nativeVideoExport";
 import { isAllowedLocalReadPath, resolveApprovedLocalMediaPath } from "../project/manager";
 import { approveUserPath } from "../utils";
+import {
+	type CaptionSidecarPayload,
+	parseCaptionSidecarPayload,
+	withCaptionSidecarMessage,
+	writeCaptionSidecarsBestEffort,
+} from "./exportCaptionSidecars";
 
 function getPartialExportDestinationPath(destinationPath: string) {
 	const parsed = path.parse(destinationPath);
@@ -421,6 +422,22 @@ export function registerExportHandlers() {
 			};
 		} catch (error) {
 			console.warn("[native-export-capabilities] Failed:", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	});
+
+	ipcMain.handle("get-detected-encoder-info", async () => {
+		try {
+			const info = await detectSystemEncoderInfo();
+			return {
+				success: true,
+				info,
+			};
+		} catch (error) {
+			console.warn("[get-detected-encoder-info] Failed:", error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),

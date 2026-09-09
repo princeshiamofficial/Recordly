@@ -27,6 +27,7 @@ export function createMotionBlurState(): MotionBlurState {
 
 interface TransformParams {
 	cameraContainer: Container;
+	videoEffectsContainer?: Container | null;
 	zoomBlurFilter?: ZoomBlurFilter | null;
 	motionBlurFilter?: MotionBlurFilter | null;
 	stageSize: { width: number; height: number };
@@ -91,7 +92,12 @@ function resetMotionEffects(
 	zoomBlurFilter?: ZoomBlurFilter | null,
 	motionBlurFilter?: MotionBlurFilter | null,
 	motionBlurState?: MotionBlurState,
+	videoEffectsContainer?: Container | null,
 ) {
+	if (videoEffectsContainer && videoEffectsContainer.filters !== null) {
+		videoEffectsContainer.filters = null;
+	}
+
 	if (motionBlurFilter) {
 		motionBlurFilter.velocity = { x: 0, y: 0 };
 		motionBlurFilter.kernelSize = 5;
@@ -372,11 +378,19 @@ function applyCameraStepBlur({
 	analysis,
 	motionBlurFilter,
 	zoomBlurFilter,
+	videoEffectsContainer,
 }: {
 	analysis: CameraStepAnalysis;
 	motionBlurFilter: MotionBlurFilter;
 	zoomBlurFilter?: ZoomBlurFilter | null;
+	videoEffectsContainer?: Container | null;
 }) {
+	const hasMoveBlur =
+		analysis.mode === "move" &&
+		Math.hypot(analysis.moveBlurVelocity.x, analysis.moveBlurVelocity.y) >=
+			MIN_DIRECTIONAL_BLUR_MAGNITUDE;
+	const hasZoomBlur = analysis.mode === "zoom" && analysis.zoomStrength > 0.001;
+
 	motionBlurFilter.velocity = analysis.moveBlurVelocity;
 	motionBlurFilter.kernelSize = DIRECTIONAL_BLUR_KERNEL_SIZE;
 	motionBlurFilter.offset = analysis.moveBlurOffset;
@@ -386,6 +400,28 @@ function applyCameraStepBlur({
 		zoomBlurFilter.strength = analysis.zoomStrength;
 		zoomBlurFilter.innerRadius = 0;
 		zoomBlurFilter.radius = -1;
+	}
+
+	if (videoEffectsContainer) {
+		if (hasMoveBlur) {
+			if (
+				!videoEffectsContainer.filters ||
+				videoEffectsContainer.filters.length !== 1 ||
+				videoEffectsContainer.filters[0] !== motionBlurFilter
+			) {
+				videoEffectsContainer.filters = [motionBlurFilter];
+			}
+		} else if (hasZoomBlur && zoomBlurFilter) {
+			if (
+				!videoEffectsContainer.filters ||
+				videoEffectsContainer.filters.length !== 1 ||
+				videoEffectsContainer.filters[0] !== zoomBlurFilter
+			) {
+				videoEffectsContainer.filters = [zoomBlurFilter];
+			}
+		} else if (videoEffectsContainer.filters !== null) {
+			videoEffectsContainer.filters = null;
+		}
 	}
 }
 
@@ -411,12 +447,15 @@ export function computeZoomTransform({
 	const focusStagePxY = baseMask.y + focusY * baseMask.height;
 	const stageCenterX = stageSize.width / 2;
 	const stageCenterY = stageSize.height / 2;
-	const scale = 1 + (zoomScale - 1) * progress;
-	const finalX = stageCenterX - focusStagePxX * zoomScale;
-	const finalY = stageCenterY - focusStagePxY * zoomScale;
+
+	const targetX = stageCenterX - focusStagePxX * zoomScale;
+	const targetY = stageCenterY - focusStagePxY * zoomScale;
+
+	const finalX = targetX;
+	const finalY = targetY;
 
 	return {
-		scale,
+		scale: 1 + (zoomScale - 1) * progress,
 		x: finalX * progress,
 		y: finalY * progress,
 	};
@@ -452,6 +491,7 @@ export function computeFocusFromTransform({
 
 export function applyZoomTransform({
 	cameraContainer,
+	videoEffectsContainer,
 	zoomBlurFilter,
 	motionBlurFilter,
 	stageSize,
@@ -475,7 +515,7 @@ export function applyZoomTransform({
 	) {
 		cameraContainer.scale.set(1);
 		cameraContainer.position.set(0, 0);
-		resetMotionEffects(zoomBlurFilter, motionBlurFilter, motionBlurState);
+		resetMotionEffects(zoomBlurFilter, motionBlurFilter, motionBlurState, videoEffectsContainer);
 		return { scale: 1, x: 0, y: 0 };
 	}
 
@@ -510,6 +550,9 @@ export function applyZoomTransform({
 			if (zoomBlurFilter) {
 				zoomBlurFilter.strength = 0;
 			}
+			if (videoEffectsContainer && videoEffectsContainer.filters !== null) {
+				videoEffectsContainer.filters = null;
+			}
 		} else {
 			const dtMs = Math.min(80, Math.max(1, now - motionBlurState.lastFrameTimeMs));
 			const dtSeconds = dtMs / 1000;
@@ -534,10 +577,10 @@ export function applyZoomTransform({
 			motionBlurState.prevCamX = transform.x;
 			motionBlurState.prevCamY = transform.y;
 			motionBlurState.prevCamScale = transform.scale;
-			applyCameraStepBlur({ analysis, motionBlurFilter, zoomBlurFilter });
+			applyCameraStepBlur({ analysis, motionBlurFilter, zoomBlurFilter, videoEffectsContainer });
 		}
 	} else {
-		resetMotionEffects(zoomBlurFilter, motionBlurFilter, motionBlurState);
+		resetMotionEffects(zoomBlurFilter, motionBlurFilter, motionBlurState, videoEffectsContainer);
 	}
 
 	return {

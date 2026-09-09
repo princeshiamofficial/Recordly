@@ -142,26 +142,40 @@ function findCmake() {
 	}
 
 	if (process.platform === "win32") {
+		const standaloneCmakePaths = [
+			path.join("C:", "Program Files", "CMake", "bin", "cmake.exe"),
+			path.join("C:", "Program Files (x86)", "CMake", "bin", "cmake.exe"),
+		];
+		for (const cmakePath of standaloneCmakePaths) {
+			if (existsSync(cmakePath)) {
+				return cmakePath;
+			}
+		}
+
+		const vsRoots = [
+			path.join("C:", "Program Files", "Microsoft Visual Studio"),
+			path.join("C:", "Program Files (x86)", "Microsoft Visual Studio"),
+		];
 		const vsEditions = ["Community", "Professional", "Enterprise", "BuildTools"];
-		for (const version of WINDOWS_VISUAL_STUDIO_INSTALL_DIRS) {
-			for (const edition of vsEditions) {
-				const cmakePath = path.join(
-					"C:",
-					"Program Files",
-					"Microsoft Visual Studio",
-					version,
-					edition,
-					"Common7",
-					"IDE",
-					"CommonExtensions",
-					"Microsoft",
-					"CMake",
-					"CMake",
-					"bin",
-					"cmake.exe",
-				);
-				if (existsSync(cmakePath)) {
-					return cmakePath;
+		for (const vsRoot of vsRoots) {
+			for (const version of WINDOWS_VISUAL_STUDIO_INSTALL_DIRS) {
+				for (const edition of vsEditions) {
+					const cmakePath = path.join(
+						vsRoot,
+						version,
+						edition,
+						"Common7",
+						"IDE",
+						"CommonExtensions",
+						"Microsoft",
+						"CMake",
+						"CMake",
+						"bin",
+						"cmake.exe",
+					);
+					if (existsSync(cmakePath)) {
+						return cmakePath;
+					}
 				}
 			}
 		}

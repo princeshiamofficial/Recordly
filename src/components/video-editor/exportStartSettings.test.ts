@@ -26,6 +26,8 @@ describe("resolveExportStartSettings", () => {
 			backendPreference: "auto",
 			pipelineModel: "modern",
 			quality: "good",
+			cinematicLook: "none",
+			cinematicLetterbox: false,
 			gifConfig: undefined,
 		});
 	});

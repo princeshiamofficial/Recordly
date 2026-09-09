@@ -23,7 +23,9 @@ export function resolveNvidiaCudaExportOptIn(
 }
 
 export function loadInitialNvidiaCudaExportOptIn() {
-	return loadAppSetting<boolean>(NVIDIA_CUDA_EXPORT_OPT_IN_SETTING_KEY) === true;
+	// NVIDIA CUDA export is enabled by default; the stored setting only records
+	// an explicit opt-out (or an opt-in after a prior opt-out).
+	return loadAppSetting<boolean>(NVIDIA_CUDA_EXPORT_OPT_IN_SETTING_KEY) !== false;
 }
 
 export function saveNvidiaCudaExportOptIn(enabled: boolean) {

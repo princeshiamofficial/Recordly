@@ -1,5 +1,6 @@
 import {
 	calculateOutputDimensions,
+	type CinematicLookPreset,
 	type ExportBackendPreference,
 	type ExportEncodingMode,
 	type ExportFormat,
@@ -22,6 +23,8 @@ export function resolveExportStartSettings({
 	mp4FrameRate,
 	exportBackendPreference,
 	exportPipelineModel,
+	cinematicLook = "none",
+	cinematicLetterbox = false,
 	gifFrameRate,
 	gifLoop,
 	gifSizePreset,
@@ -35,6 +38,8 @@ export function resolveExportStartSettings({
 	mp4FrameRate: ExportMp4FrameRate;
 	exportBackendPreference: ExportBackendPreference;
 	exportPipelineModel: ExportPipelineModel;
+	cinematicLook?: CinematicLookPreset;
+	cinematicLetterbox?: boolean;
 	gifFrameRate: GifFrameRate;
 	gifLoop: boolean;
 	gifSizePreset: GifSizePreset;
@@ -52,6 +57,8 @@ export function resolveExportStartSettings({
 		backendPreference: exportFormat === "mp4" ? exportBackendPreference : undefined,
 		pipelineModel: exportFormat === "mp4" ? exportPipelineModel : undefined,
 		quality: exportFormat === "mp4" ? exportQuality : undefined,
+		cinematicLook: exportFormat === "mp4" ? cinematicLook : undefined,
+		cinematicLetterbox: exportFormat === "mp4" ? cinematicLetterbox : undefined,
 		gifConfig:
 			exportFormat === "gif" && gifDimensions
 				? {

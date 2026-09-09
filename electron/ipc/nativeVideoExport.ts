@@ -3,7 +3,13 @@ import {
 	VIDEO_SHADOW_LAYER_PROFILES,
 } from "../../src/lib/exporter/shadowProfile";
 import { getSquirclePathPoints } from "../../src/lib/geometry/squircle";
-import { ATEMPO_FILTER_EPSILON, buildAtempoFilters } from "./ffmpeg/filters";
+import {
+	ATEMPO_FILTER_EPSILON,
+	buildAtempoFilters,
+	buildCinematicVideoFilter,
+} from "./ffmpeg/filters";
+
+export { buildCinematicVideoFilter };
 
 const NATIVE_EXPORT_INPUT_BYTES_PER_PIXEL = 4;
 const MIN_EDITED_TRACK_TEMPO_SPEED = 0.5;
@@ -23,6 +29,7 @@ export interface NativeVideoExportStartOptions {
 	bitrate: number;
 	encodingMode: NativeExportEncodingMode;
 	inputMode?: "rawvideo" | "h264-stream";
+	vflip?: boolean;
 }
 
 export interface NativeVideoExportAudioSegment {
@@ -45,6 +52,8 @@ export interface NativeVideoExportFinishOptions {
 	editedTrackSegments?: NativeVideoExportEditedTrackSegment[];
 	editedAudioData?: ArrayBuffer;
 	editedAudioMimeType?: string | null;
+	cinematicLook?: string | null;
+	cinematicLetterbox?: boolean | null;
 }
 
 export interface NativeVideoAudioMuxMetrics {
@@ -130,12 +139,33 @@ export function getPreferredNativeVideoEncoders(platform: NodeJS.Platform): stri
 function getLibx264ModeArgs(encodingMode: NativeExportEncodingMode): string[] {
 	switch (encodingMode) {
 		case "fast":
-			return ["-preset", "ultrafast", "-tune", "zerolatency"];
+			return [
+				"-preset",
+				"ultrafast",
+				"-tune",
+				"zerolatency",
+				"-threads",
+				"0",
+				"-thread_type",
+				"frame+slice",
+			];
 		case "quality":
-			return ["-preset", "slow"];
+			return ["-preset", "slow", "-threads", "0"];
 		case "balanced":
 		default:
-			return ["-preset", "medium"];
+			return ["-preset", "medium", "-threads", "0"];
+	}
+}
+
+function getMediaFoundationModeArgs(encodingMode: NativeExportEncodingMode): string[] {
+	switch (encodingMode) {
+		case "fast":
+			return ["-scenario", "1", "-quality", "0"];
+		case "quality":
+			return ["-scenario", "0", "-quality", "100"];
+		case "balanced":
+		default:
+			return ["-scenario", "0", "-quality", "50"];
 	}
 }
 
@@ -295,8 +325,7 @@ export function buildNativeVideoExportArgs(
 		String(options.frameRate),
 		"-i",
 		"pipe:0",
-		"-vf",
-		"vflip",
+		...(options.vflip ? ["-vf", "vflip"] : []),
 		"-an",
 		"-c:v",
 		encoder,
@@ -307,6 +336,10 @@ export function buildNativeVideoExportArgs(
 
 	if (encoder === "libx264") {
 		args.push(...getLibx264ModeArgs(options.encodingMode));
+	} else if (encoder === "h264_nvenc") {
+		args.push(...getNvencStaticLayoutModeArgs(options.encodingMode));
+	} else if (encoder === "h264_mf") {
+		args.push(...getMediaFoundationModeArgs(options.encodingMode));
 	}
 
 	args.push("-pix_fmt", "yuv420p", "-movflags", "+faststart", outputPath);

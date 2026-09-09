@@ -458,6 +458,7 @@ export function registerRecordingHandlers(
 					const config: Record<string, unknown> = {
 						outputPath: tempVideoPath,
 						fps: 60,
+						quality: options?.recordingQuality ?? 2,
 					};
 
 					if (captureTarget.kind === "invalid-window") {

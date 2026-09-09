@@ -76,8 +76,8 @@ describe("calculateMp4ExportDimensions", () => {
 		expect(
 			calculateMp4ExportDimensions(sourceDimensions.width, sourceDimensions.height, "high"),
 		).toEqual({
-			width: 1726,
-			height: 970,
+			width: 1920,
+			height: 1080,
 		});
 	});
 
@@ -93,8 +93,43 @@ describe("calculateMp4ExportDimensions", () => {
 		expect(
 			calculateMp4ExportDimensions(sourceDimensions.width, sourceDimensions.height, "high"),
 		).toEqual({
-			width: 972,
-			height: 1728,
+			width: 1080,
+			height: 1920,
+		});
+		expect(
+			calculateMp4ExportDimensions(sourceDimensions.width, sourceDimensions.height, "4k"),
+		).toEqual({
+			width: 2160,
+			height: 3840,
+		});
+		expect(
+			calculateMp4ExportDimensions(sourceDimensions.width, sourceDimensions.height, "8k"),
+		).toEqual({
+			width: 4320,
+			height: 7680,
+		});
+	});
+
+	it("calculates 16:9 standard resolution tiers accurately", () => {
+		expect(calculateMp4ExportDimensions(1920, 1080, "8k")).toEqual({
+			width: 7680,
+			height: 4320,
+		});
+		expect(calculateMp4ExportDimensions(1920, 1080, "4k")).toEqual({
+			width: 3840,
+			height: 2160,
+		});
+		expect(calculateMp4ExportDimensions(1920, 1080, "2k")).toEqual({
+			width: 2560,
+			height: 1440,
+		});
+		expect(calculateMp4ExportDimensions(1920, 1080, "high")).toEqual({
+			width: 1920,
+			height: 1080,
+		});
+		expect(calculateMp4ExportDimensions(1920, 1080, "good")).toEqual({
+			width: 1280,
+			height: 720,
 		});
 	});
 });

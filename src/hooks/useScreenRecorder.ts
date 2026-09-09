@@ -10,17 +10,21 @@ import {
 } from "./recordingMimeType";
 
 const TARGET_FRAME_RATE = 60;
-const TARGET_WIDTH = 3840;
-const TARGET_HEIGHT = 2160;
-const FOUR_K_PIXELS = TARGET_WIDTH * TARGET_HEIGHT;
+const TARGET_WIDTH = 7680;
+const TARGET_HEIGHT = 4320;
+const EIGHT_K_PIXELS = TARGET_WIDTH * TARGET_HEIGHT;
+const FOUR_K_WIDTH = 3840;
+const FOUR_K_HEIGHT = 2160;
+const FOUR_K_PIXELS = FOUR_K_WIDTH * FOUR_K_HEIGHT;
 const QHD_WIDTH = 2560;
 const QHD_HEIGHT = 1440;
 const QHD_PIXELS = QHD_WIDTH * QHD_HEIGHT;
+const BITRATE_8K = 80_000_000;
 const BITRATE_4K = 45_000_000;
 const BITRATE_QHD = 28_000_000;
 const BITRATE_BASE = 18_000_000;
 const HIGH_FRAME_RATE_THRESHOLD = 60;
-const HIGH_FRAME_RATE_BOOST = 1.7;
+const HIGH_FRAME_RATE_BOOST = 1.35;
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const CODEC_ALIGNMENT = 2;
@@ -39,6 +43,7 @@ const WEBCAM_FRAME_RATE = 30;
 const WEBCAM_SUFFIX = "-webcam";
 const MICROPHONE_FALLBACK_ERROR_TOAST_ID = "recording-microphone-fallback-error";
 const MICROPHONE_SIDECAR_ERROR_TOAST_ID = "recording-microphone-sidecar-error";
+
 export type BrowserMicrophoneProfile =
 	| "processed"
 	| "no-agc"
@@ -51,6 +56,7 @@ export type BrowserCaptureCursorPolicy = {
 	hideOsCursorBeforeRecording: boolean;
 	hideEditorOverlayCursorByDefault: boolean;
 };
+
 const DEFAULT_BROWSER_MICROPHONE_PROFILE: BrowserMicrophoneProfile = "processed";
 const BROWSER_MICROPHONE_PROFILES = new Set<BrowserMicrophoneProfile>([
 	"processed",
@@ -153,6 +159,8 @@ type UseScreenRecorderReturn = {
 	setWebcamDeviceId: (deviceId: string | undefined) => void;
 	countdownDelay: number;
 	setCountdownDelay: (delay: number) => void;
+	recordingQuality: number;
+	setRecordingQuality: (quality: number) => void;
 };
 
 function getErrorMessage(error: unknown) {
@@ -333,6 +341,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	const [webcamEnabled, setWebcamEnabled] = useState(false);
 	const [webcamDeviceId, setWebcamDeviceId] = useState<string | undefined>(undefined);
 	const [countdownDelay, setCountdownDelayState] = useState(3);
+	const [recordingQuality, setRecordingQualityState] = useState<number>(2); // 1=Low, 2=Medium, 3=High, 4=Ultra, 5=PixelPerfect
 	const mediaRecorder = useRef<MediaRecorder | null>(null);
 	const webcamRecorder = useRef<MediaRecorder | null>(null);
 	const stream = useRef<MediaStream | null>(null);
@@ -500,8 +509,8 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			await window.electronAPI.openScreenRecordingPreferences();
 			alert(
 				options.startup
-					? "Recordly needs Screen Recording permission before you start. System Settings has been opened. After enabling it, quit and reopen Recordly."
-					: "Screen Recording permission is still missing. System Settings has been opened again. Enable it, then quit and reopen Recordly before recording.",
+					? "CamVerse needs Screen Recording permission before you start. System Settings has been opened. After enabling it, quit and reopen CamVerse."
+					: "Screen Recording permission is still missing. System Settings has been opened again. Enable it, then quit and reopen CamVerse before recording.",
 			);
 			return false;
 		}
@@ -523,8 +532,8 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		await window.electronAPI.openAccessibilityPreferences();
 		alert(
 			options.startup
-				? "Recordly also needs Accessibility permission for cursor tracking. System Settings has been opened. After enabling it, quit and reopen Recordly."
-				: "Accessibility permission is still missing. System Settings has been opened again. Enable it, then quit and reopen Recordly before recording.",
+				? "CamVerse also needs Accessibility permission for cursor tracking. System Settings has been opened. After enabling it, quit and reopen CamVerse."
+				: "Accessibility permission is still missing. System Settings has been opened again. Enable it, then quit and reopen CamVerse before recording.",
 		);
 
 		return false;
@@ -543,15 +552,29 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		const highFrameRateBoost =
 			TARGET_FRAME_RATE >= HIGH_FRAME_RATE_THRESHOLD ? HIGH_FRAME_RATE_BOOST : 1;
 
+		// Quality multiplier: 1=0.75x, 2=1x, 3=1.5x, 4=2x, 5=2.5x (Pixel Perfect)
+		const qualityMultipliers: Record<number, number> = {
+			1: 0.75,
+			2: 1.0,
+			3: 1.5,
+			4: 2.0,
+			5: 2.5,
+		};
+		const qualityMultiplier = qualityMultipliers[recordingQuality] ?? 1.0;
+
+		if (pixels >= EIGHT_K_PIXELS) {
+			return Math.round(BITRATE_8K * highFrameRateBoost * qualityMultiplier);
+		}
+
 		if (pixels >= FOUR_K_PIXELS) {
-			return Math.round(BITRATE_4K * highFrameRateBoost);
+			return Math.round(BITRATE_4K * highFrameRateBoost * qualityMultiplier);
 		}
 
 		if (pixels >= QHD_PIXELS) {
-			return Math.round(BITRATE_QHD * highFrameRateBoost);
+			return Math.round(BITRATE_QHD * highFrameRateBoost * qualityMultiplier);
 		}
 
-		return Math.round(BITRATE_BASE * highFrameRateBoost);
+		return Math.round(BITRATE_BASE * highFrameRateBoost * qualityMultiplier);
 	};
 
 	const cleanupCapturedMedia = useCallback(() => {
@@ -710,7 +733,11 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			}
 
 			setFinalizing(false);
-			await window.electronAPI.switchToEditor();
+			try {
+				await window.electronAPI.switchToEditor();
+			} catch (switchError) {
+				console.error("Failed to switch to editor:", switchError);
+			}
 			console.log(
 				`[PERF:RENDERER] Finalize Session & Switch to Editor: COMPLETED in ${(performance.now() - start).toFixed(2)}ms`,
 			);
@@ -1075,119 +1102,138 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			setFinalizing(true);
 
 			void (async () => {
-				const stopStart = performance.now();
-				console.log("[PERF:RENDERER] Total Stop Sequence: STARTED");
+				try {
+					const stopStart = performance.now();
+					console.log("[PERF:RENDERER] Total Stop Sequence: STARTED");
 
-				const fallbackStartDelayMs = micFallbackStartDelayMs.current;
-				const fallbackTrackSettings = micFallbackTrackSettings.current;
-				const stoppedAtMs = Date.now();
-				markRecordingResumed(stoppedAtMs);
-				const expectedDurationMs = getRecordingDurationMs(stoppedAtMs);
-				const micFallbackBlobPromise = stopMicFallbackRecorder();
-				const webcamPathPromise = stopWebcamRecorder();
-				const isNativeWindows = nativeWindowsRecording.current;
-				nativeWindowsRecording.current = false;
+					const fallbackStartDelayMs = micFallbackStartDelayMs.current;
+					const fallbackTrackSettings = micFallbackTrackSettings.current;
+					const stoppedAtMs = Date.now();
+					markRecordingResumed(stoppedAtMs);
+					const expectedDurationMs = getRecordingDurationMs(stoppedAtMs);
+					const micFallbackBlobPromise = stopMicFallbackRecorder();
+					const webcamPathPromise = stopWebcamRecorder();
+					const isNativeWindows = nativeWindowsRecording.current;
+					nativeWindowsRecording.current = false;
 
-				const ipcStopStart = performance.now();
-				console.log("[PERF:RENDERER] IPC: stopNativeScreenRecording: STARTED");
-				const result = await window.electronAPI.stopNativeScreenRecording();
-				console.log(
-					`[PERF:RENDERER] IPC: stopNativeScreenRecording: COMPLETED in ${(performance.now() - ipcStopStart).toFixed(2)}ms`,
-				);
-
-				await window.electronAPI?.setRecordingState(false);
-
-				if (!result.success || !result.path) {
-					console.error(
-						"Failed to stop native screen recording:",
-						result.error ?? result.message,
+					const ipcStopStart = performance.now();
+					console.log("[PERF:RENDERER] IPC: stopNativeScreenRecording: STARTED");
+					const result = await window.electronAPI.stopNativeScreenRecording();
+					console.log(
+						`[PERF:RENDERER] IPC: stopNativeScreenRecording: COMPLETED in ${(performance.now() - ipcStopStart).toFixed(2)}ms`,
 					);
-					void logNativeCaptureDiagnostics("stop-native-screen-recording");
-					try {
-						const recoveredPath = await recoverNativeRecordingSession(
-							micFallbackBlobPromise,
-							fallbackStartDelayMs,
+
+					await window.electronAPI?.setRecordingState(false);
+
+					if (!result.success || !result.path) {
+						console.error(
+							"Failed to stop native screen recording:",
+							result.error ?? result.message,
 						);
-						if (recoveredPath) {
-							console.log(
-								`[PERF:RENDERER] Total Stop Sequence (RECOVERED) in ${(performance.now() - stopStart).toFixed(2)}ms`,
+						void logNativeCaptureDiagnostics("stop-native-screen-recording");
+						try {
+							const recoveredPath = await recoverNativeRecordingSession(
+								micFallbackBlobPromise,
+								fallbackStartDelayMs,
 							);
-							return;
+							if (recoveredPath) {
+								console.log(
+									`[PERF:RENDERER] Total Stop Sequence (RECOVERED) in ${(performance.now() - stopStart).toFixed(2)}ms`,
+								);
+								return;
+							}
+						} catch (recoveryError) {
+							console.error(
+								"Failed to recover native screen recording:",
+								recoveryError,
+							);
 						}
-					} catch (recoveryError) {
-						console.error("Failed to recover native screen recording:", recoveryError);
+
+						const failureMessage = await buildNativeCaptureFailureMessage(
+							"stop-native-screen-recording",
+							isMacOS
+								? "Failed to finish the macOS recording, so the editor was not opened."
+								: "Failed to finish the recording, so the editor was not opened.",
+						);
+						await notifyRecordingFinalizationFailure(failureMessage);
+						return;
 					}
 
-					const failureMessage = await buildNativeCaptureFailureMessage(
-						"stop-native-screen-recording",
-						isMacOS
-							? "Failed to finish the macOS recording, so the editor was not opened."
-							: "Failed to finish the recording, so the editor was not opened.",
-					);
-					await notifyRecordingFinalizationFailure(failureMessage);
-					return;
+					const finalPath = result.path;
+
+					// 1. Finalize the session and switch to editor immediately (Optimistic UI)
+					// We pass null for webcamPath initially to avoid blocking on webcam disk writes/muxing.
+					await finalizeRecordingSession(finalPath, null);
+
+					// 2. Perform background finalization (webcam, muxing, sidecars)
+					// We don't await this to keep the UI responsive
+					void (async () => {
+						try {
+							// Await the webcam path in the background
+							const webcamPath = await webcamPathPromise;
+							console.log(
+								"[useScreenRecorder] Background native processing: webcamPath is",
+								webcamPath,
+							);
+
+							// Store sidecars
+							await storeMicrophoneSidecar(
+								micFallbackBlobPromise,
+								finalPath,
+								fallbackStartDelayMs,
+								fallbackTrackSettings,
+							);
+
+							// Perform muxing/renaming if on Windows
+							if (isNativeWindows) {
+								await window.electronAPI.muxNativeWindowsRecording(
+									expectedDurationMs,
+								);
+							}
+
+							console.log(
+								"[useScreenRecorder] Emitting setCurrentRecordingSession with:",
+								{ finalPath, webcamPath },
+							);
+
+							// Update the session state to notify the editor that all background assets (webcam, mic, etc.) are now ready.
+							// This broadcasts a 'recording-session-changed' event that the open editor listens to for re-scanning assets.
+							await window.electronAPI.setCurrentRecordingSession({
+								videoPath: finalPath,
+								webcamPath,
+								timeOffsetMs: webcamTimeOffsetMs.current,
+								hideOverlayCursorByDefault:
+									hideEditorOverlayCursorByDefault.current,
+							});
+
+							console.log(
+								`[PERF:RENDERER] Background Stop Sequence: COMPLETED in ${(performance.now() - stopStart).toFixed(2)}ms`,
+							);
+						} catch (bgError) {
+							console.error("Error in background finalization:", bgError);
+						} finally {
+							// After all background tasks are done (webcam, mic sidecars, muxing),
+							// we can safely close the HUD window to release hardware and resources.
+							if (typeof window.electronAPI?.hudOverlayClose === "function") {
+								console.log(
+									"[useScreenRecorder] All background tasks finished, closing HUD",
+								);
+								window.electronAPI.hudOverlayClose();
+							}
+						}
+					})();
+				} catch (error) {
+					console.error("Error in native recording stop sequence:", error);
+					setFinalizing(false);
+					try {
+						await notifyRecordingFinalizationFailure(
+							"An error occurred while finishing the recording. Please try again.",
+						);
+					} catch {
+						// Last resort: just reset state
+						setFinalizing(false);
+					}
 				}
-
-				const finalPath = result.path;
-
-				// 1. Finalize the session and switch to editor immediately (Optimistic UI)
-				// We pass null for webcamPath initially to avoid blocking on webcam disk writes/muxing.
-				await finalizeRecordingSession(finalPath, null);
-
-				// 2. Perform background finalization (webcam, muxing, sidecars)
-				// We don't await this to keep the UI responsive
-				void (async () => {
-					try {
-						// Await the webcam path in the background
-						const webcamPath = await webcamPathPromise;
-						console.log(
-							"[useScreenRecorder] Background native processing: webcamPath is",
-							webcamPath,
-						);
-
-						// Store sidecars
-						await storeMicrophoneSidecar(
-							micFallbackBlobPromise,
-							finalPath,
-							fallbackStartDelayMs,
-							fallbackTrackSettings,
-						);
-
-						// Perform muxing/renaming if on Windows
-						if (isNativeWindows) {
-							await window.electronAPI.muxNativeWindowsRecording(expectedDurationMs);
-						}
-
-						console.log(
-							"[useScreenRecorder] Emitting setCurrentRecordingSession with:",
-							{ finalPath, webcamPath },
-						);
-
-						// Update the session state to notify the editor that all background assets (webcam, mic, etc.) are now ready.
-						// This broadcasts a 'recording-session-changed' event that the open editor listens to for re-scanning assets.
-						await window.electronAPI.setCurrentRecordingSession({
-							videoPath: finalPath,
-							webcamPath,
-							timeOffsetMs: webcamTimeOffsetMs.current,
-							hideOverlayCursorByDefault: hideEditorOverlayCursorByDefault.current,
-						});
-
-						console.log(
-							`[PERF:RENDERER] Background Stop Sequence: COMPLETED in ${(performance.now() - stopStart).toFixed(2)}ms`,
-						);
-					} catch (bgError) {
-						console.error("Error in background finalization:", bgError);
-					} finally {
-						// After all background tasks are done (webcam, mic sidecars, muxing),
-						// we can safely close the HUD window to release hardware and resources.
-						if (typeof window.electronAPI?.hudOverlayClose === "function") {
-							console.log(
-								"[useScreenRecorder] All background tasks finished, closing HUD",
-							);
-							window.electronAPI.hudOverlayClose();
-						}
-					}
-				})();
 			})();
 			return;
 		}
@@ -1256,6 +1302,11 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		void window.electronAPI.setCountdownDelay(delay);
 	}, []);
 
+	const setRecordingQuality = useCallback((quality: number) => {
+		setRecordingQualityState(quality);
+		void window.electronAPI.setRecordingPreferences({ recordingQuality: quality });
+	}, []);
+
 	useEffect(() => {
 		if (recordingPrefsLoaded.current) return;
 		recordingPrefsLoaded.current = true;
@@ -1268,6 +1319,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					setMicrophoneDeviceId(result.microphoneDeviceId);
 				}
 				setSystemAudioEnabled(result.systemAudioEnabled);
+				if (typeof result.recordingQuality === "number") {
+					setRecordingQualityState(result.recordingQuality);
+				}
 			}
 		})();
 	}, []);
@@ -1412,6 +1466,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
 			let useNativeWindowsCapture = false;
 			let nativeWindowsCaptureStartFailed = false;
+
 			if (
 				platform === "win32" &&
 				shouldUseNativeWindowsCaptureForSource(selectedSource) &&
@@ -1461,6 +1516,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 						capturesMicrophone: microphoneEnabled,
 						microphoneDeviceId,
 						microphoneLabel: micLabel,
+						recordingQuality,
 					},
 				);
 				if (!nativeResult.success) {
@@ -1618,12 +1674,11 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			let systemAudioIncluded = false;
 			const mediaDevices = navigator.mediaDevices as DesktopCaptureMediaDevices;
 			const useLinuxPortal = selectedSource.id === "screen:linux-portal";
+
 			const browserScreenVideoConstraints = {
 				mandatory: {
 					chromeMediaSource: CHROME_MEDIA_SOURCE,
 					chromeMediaSourceId: browserCaptureSource.id,
-					maxWidth: TARGET_WIDTH,
-					maxHeight: TARGET_HEIGHT,
 					maxFrameRate: TARGET_FRAME_RATE,
 					minFrameRate: MIN_FRAME_RATE,
 					googCaptureCursor: browserCursorPolicy.streamCursor === "always",
@@ -1638,8 +1693,6 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 						audio: withAudio,
 						video: {
 							displaySurface: "monitor",
-							width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-							height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
 							frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
 							cursor: browserCursorPolicy.streamCursor,
 						},
@@ -1749,8 +1802,6 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 								displaySurface: selectedSource.id?.startsWith("window:")
 									? "window"
 									: "monitor",
-								width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-								height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
 								frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
 								cursor: browserCursorPolicy.streamCursor,
 							},
@@ -1773,12 +1824,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			try {
 				await videoTrack.applyConstraints({
 					frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
-					width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-					height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
 				} as MediaTrackConstraints);
 			} catch (error) {
 				console.warn(
-					"Unable to lock 4K/60fps constraints, using best available track settings.",
+					"Unable to lock browser capture constraints, using best available track settings.",
 					error,
 				);
 			}
@@ -2160,5 +2209,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		setWebcamDeviceId,
 		countdownDelay,
 		setCountdownDelay,
+		recordingQuality,
+		setRecordingQuality,
 	};
 }

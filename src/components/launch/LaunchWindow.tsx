@@ -7,6 +7,7 @@ import {
 	MicrophoneSlashIcon,
 	MinusIcon,
 	MonitorIcon,
+	StarIcon,
 	TimerIcon,
 	VideoCameraIcon,
 	VideoCameraSlashIcon,
@@ -31,6 +32,7 @@ import { useRecordingTimer } from "./hooks/useRecordingTimer";
 import { useWebcamPreviewOverlay } from "./hooks/useWebcamPreviewOverlay";
 import styles from "./LaunchWindow.module.css";
 import { CountdownPopover } from "./popovers/CountdownPopover";
+import { QualityPopover } from "./popovers/QualityPopover";
 import {
 	LaunchPopoverCoordinatorProvider,
 	useLaunchPopoverCoordinator,
@@ -82,6 +84,8 @@ function LaunchWindowContent() {
 		setWebcamDeviceId,
 		countdownDelay,
 		setCountdownDelay,
+		recordingQuality,
+		setRecordingQuality,
 		preparePermissions,
 	} = useScreenRecorder();
 
@@ -358,6 +362,22 @@ function LaunchWindowContent() {
 						className={countdownDelay > 0 ? styles.ibActive : ""}
 					>
 						<TimerIcon size={18} />
+					</Button>
+				}
+			/>
+
+			<QualityPopover
+				recordingQuality={recordingQuality}
+				onSelectQuality={setRecordingQuality}
+				trigger={
+					<Button
+						variant="ghost"
+						size="icon"
+						iconSize="lg"
+						title="Recording Quality"
+						className={recordingQuality !== 2 ? styles.ibActive : ""}
+					>
+						<StarIcon size={18} />
 					</Button>
 				}
 			/>

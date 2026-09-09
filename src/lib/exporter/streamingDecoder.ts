@@ -336,13 +336,21 @@ export class StreamingVideoDecoder {
 						);
 					}
 
+					const startupDecodeLimit = Math.max(
+						STARTUP_MAX_DECODE_QUEUE,
+						Math.floor(this.maxDecodeQueue * 0.6),
+					);
+					const startupPendingLimit = Math.max(
+						STARTUP_MAX_PENDING_FRAMES,
+						Math.floor(this.maxPendingFrames * 0.6),
+					);
 					const decodeQueueLimit =
 						exportFrameIndex < startupFrameBudget
-							? Math.min(this.maxDecodeQueue, STARTUP_MAX_DECODE_QUEUE)
+							? Math.min(this.maxDecodeQueue, startupDecodeLimit)
 							: this.maxDecodeQueue;
 					const pendingFrameLimit =
 						exportFrameIndex < startupFrameBudget
-							? Math.min(this.maxPendingFrames, STARTUP_MAX_PENDING_FRAMES)
+							? Math.min(this.maxPendingFrames, startupPendingLimit)
 							: this.maxPendingFrames;
 
 					// Backpressure on both decode queue and decoded frame backlog.

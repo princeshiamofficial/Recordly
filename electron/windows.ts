@@ -328,6 +328,15 @@ ipcMain.on("hud-overlay-set-ignore-mouse", (_event, ignore: boolean) => {
 ipcMain.on("hud-overlay-set-teleprompter-visible", (_event, visible: boolean) => {
 	hudOverlayTeleprompterVisible = Boolean(visible);
 	applyHudOverlayBounds();
+	if (visible) {
+		setHudOverlayMousePassthrough(false);
+		if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
+			hudOverlayWindow.setFocusable(true);
+			hudOverlayWindow.focus();
+		}
+	} else {
+		setHudOverlayMousePassthrough(hudOverlayIgnoringMouse);
+	}
 });
 
 ipcMain.on("hud-overlay-set-source-selection-active", (_event, active: boolean) => {
@@ -501,7 +510,7 @@ export function createHudOverlayWindow(): BrowserWindow {
 		skipTaskbar: true,
 		hasShadow: false,
 		show: false,
-		focusable: false,
+		focusable: true,
 		webPreferences: {
 			preload: path.join(electronWindowsDir, "preload.mjs"),
 			nodeIntegration: false,
@@ -516,7 +525,7 @@ export function createHudOverlayWindow(): BrowserWindow {
 			return;
 		}
 		hasShownHudWindow = true;
-		win.show();
+		win.showInactive();
 		win.moveTop();
 		if (process.platform === "win32" && isHudOverlayMousePassthroughSupported()) {
 			win.setIgnoreMouseEvents(false);
@@ -905,7 +914,7 @@ export function createEditorWindow(): BrowserWindow {
 		resizable: true,
 		alwaysOnTop: false,
 		skipTaskbar: false,
-		title: "Recordly",
+		title: "CamVerse",
 		show: false,
 		backgroundColor: "#000000",
 		webPreferences: {
@@ -1076,4 +1085,56 @@ export function closeCountdownWindow(): void {
 		countdownWindow.close();
 		countdownWindow = null;
 	}
+}
+
+export function createDashboardWindow(): BrowserWindow {
+	const isMac = process.platform === "darwin";
+	const { workArea, workAreaSize } = getScreen().getPrimaryDisplay();
+	const initialWidth = isMac ? Math.round(workAreaSize.width * 0.65) : Math.round(workArea.width * 0.65);
+	const initialHeight = isMac ? Math.round(workAreaSize.height * 0.7) : Math.round(workArea.height * 0.7);
+
+	const win = new BrowserWindow({
+		width: Math.max(700, initialWidth),
+		height: Math.max(500, initialHeight),
+		...(!isMac && {
+			x: workArea.x + Math.round((workArea.width - Math.max(700, initialWidth)) / 2),
+			y: workArea.y + Math.round((workArea.height - Math.max(500, initialHeight)) / 2),
+		}),
+		minWidth: 600,
+		minHeight: 450,
+		...(process.platform !== "darwin" && {
+			icon: WINDOW_ICON_PATH,
+		}),
+		...(isMac && {
+			titleBarStyle: "hiddenInset",
+			trafficLightPosition: { x: 12, y: 12 },
+		}),
+		autoHideMenuBar: !isMac,
+		transparent: false,
+		resizable: true,
+		alwaysOnTop: false,
+		skipTaskbar: false,
+		title: "CamVerse",
+		show: false,
+		backgroundColor: "#000000",
+		webPreferences: {
+			preload: path.join(electronWindowsDir, "preload.mjs"),
+			nodeIntegration: false,
+			contextIsolation: true,
+			webSecurity: false,
+			backgroundThrottling: false,
+		},
+	});
+
+	win.once("ready-to-show", () => {
+		win.show();
+	});
+
+	if (VITE_DEV_SERVER_URL) {
+		win.loadURL(VITE_DEV_SERVER_URL);
+	} else {
+		win.loadFile(path.join(RENDERER_DIST, "index.html"));
+	}
+
+	return win;
 }

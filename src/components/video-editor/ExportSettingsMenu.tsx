@@ -5,10 +5,11 @@ import {
 	Lightning,
 } from "@phosphor-icons/react";
 import { LayoutGroup, motion } from "motion/react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { useScopedT } from "@/contexts/I18nContext";
 import type {
+	CinematicLookPreset,
 	ExportEncodingMode,
 	ExportFormat,
 	ExportMp4FrameRate,
@@ -17,7 +18,12 @@ import type {
 	GifFrameRate,
 	GifSizePreset,
 } from "@/lib/exporter";
-import { GIF_FRAME_RATES, GIF_SIZE_PRESETS, MP4_FRAME_RATES } from "@/lib/exporter";
+import {
+	CINEMATIC_LOOK_PRESETS,
+	GIF_FRAME_RATES,
+	GIF_SIZE_PRESETS,
+	MP4_FRAME_RATES,
+} from "@/lib/exporter";
 import { cn } from "@/lib/utils";
 
 interface ExportSettingsMenuProps {
@@ -34,6 +40,10 @@ interface ExportSettingsMenuProps {
 	experimentalNvidiaCudaExport?: boolean;
 	onExperimentalNvidiaCudaExportChange?: (enabled: boolean) => void;
 	nvidiaCudaExportAvailable?: boolean;
+	cinematicLook?: CinematicLookPreset;
+	onCinematicLookChange?: (look: CinematicLookPreset) => void;
+	cinematicLetterbox?: boolean;
+	onCinematicLetterboxChange?: (enabled: boolean) => void;
 	showCaptionSidecarOption?: boolean;
 	includeCaptionSidecar?: boolean;
 	onIncludeCaptionSidecarChange?: (enabled: boolean) => void;
@@ -64,6 +74,10 @@ export function ExportSettingsMenu({
 	experimentalNvidiaCudaExport = false,
 	onExperimentalNvidiaCudaExportChange,
 	nvidiaCudaExportAvailable = false,
+	cinematicLook = "none",
+	onCinematicLookChange,
+	cinematicLetterbox = false,
+	onCinematicLetterboxChange,
 	showCaptionSidecarOption = false,
 	includeCaptionSidecar = false,
 	onIncludeCaptionSidecarChange,
@@ -81,6 +95,31 @@ export function ExportSettingsMenu({
 }: ExportSettingsMenuProps) {
 	const tSettings = useScopedT("settings");
 	const isLegacyModel = exportPipelineModel === "legacy";
+	const [detectedEncoder, setDetectedEncoder] = useState<{
+		encoderName: string;
+		isHardware: boolean;
+		displayName: string;
+		gpuModel?: string;
+	} | null>(null);
+
+	useEffect(() => {
+		let isMounted = true;
+		if (typeof window !== "undefined" && window.electronAPI?.getDetectedEncoderInfo) {
+			window.electronAPI
+				.getDetectedEncoderInfo()
+				.then((res) => {
+					if (isMounted && res.success && res.info) {
+						setDetectedEncoder(res.info);
+					}
+				})
+				.catch(() => {
+					// Non-critical: ignore encoder detection failure in UI
+				});
+		}
+		return () => {
+			isMounted = false;
+		};
+	}, []);
 
 	return (
 		<div
@@ -93,6 +132,24 @@ export function ExportSettingsMenu({
 				<span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
 					{tSettings("export.title", "Export")}
 				</span>
+				{detectedEncoder ? (
+					<span
+						className={cn(
+							"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+							detectedEncoder.isHardware
+								? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+								: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+						)}
+						title={
+							detectedEncoder.gpuModel
+								? `${detectedEncoder.displayName} (${detectedEncoder.gpuModel})`
+								: detectedEncoder.displayName
+						}
+					>
+						<Lightning weight="fill" className="h-3 w-3" />
+						{detectedEncoder.displayName}
+					</span>
+				) : null}
 			</div>
 
 			<div className="mb-3 flex items-center gap-2">
@@ -137,13 +194,18 @@ export function ExportSettingsMenu({
 
 			{exportFormat === "mp4" ? (
 				<LayoutGroup id="header-export-quality-toggle">
-					<div className="mb-3 grid min-h-12 w-full grid-cols-4 rounded-xl border border-foreground/5 bg-foreground/5 p-0.5">
+					<div className="mb-3 grid min-h-12 w-full grid-cols-3 gap-1 rounded-xl border border-foreground/5 bg-foreground/5 p-1">
 						{(
 							[
-								{ value: "medium", label: tSettings("export.quality.low") },
-								{ value: "good", label: tSettings("export.quality.medium") },
-								{ value: "high", label: tSettings("export.quality.high") },
-								{ value: "source", label: tSettings("export.quality.original") },
+								{ value: "8k", label: "8K UHD" },
+								{ value: "4k", label: "4K UHD" },
+								{ value: "2k", label: "2K QHD" },
+								{ value: "high", label: "1080p FHD" },
+								{ value: "good", label: "720p HD" },
+								{
+									value: "source",
+									label: tSettings("export.quality.original", "Original"),
+								},
 							] as const
 						).map((option) => {
 							const isActive = exportQuality === option.value;
@@ -153,7 +215,7 @@ export function ExportSettingsMenu({
 									type="button"
 									onClick={() => onExportQualityChange?.(option.value)}
 									aria-pressed={isActive}
-									className="relative rounded-lg px-1 py-1 text-[11px] font-medium transition-colors"
+									className="relative rounded-lg px-1 py-1.5 text-[11px] font-medium transition-colors"
 								>
 									{isActive ? (
 										<motion.span
@@ -170,13 +232,14 @@ export function ExportSettingsMenu({
 										<span
 											className={cn(
 												isActive
-													? "text-white dark:text-black"
+													? "text-white dark:text-black font-semibold"
 													: "text-muted-foreground hover:text-foreground",
 											)}
 										>
 											{option.label}
 										</span>
-										{mp4OutputDimensions ? (
+										{mp4OutputDimensions &&
+										mp4OutputDimensions[option.value] ? (
 											<span
 												className={cn(
 													"mt-0.5 text-[9px]",
@@ -185,7 +248,7 @@ export function ExportSettingsMenu({
 														: "text-muted-foreground/70",
 												)}
 											>
-												{mp4OutputDimensions[option.value].width} x{" "}
+												{mp4OutputDimensions[option.value].width} ×{" "}
 												{mp4OutputDimensions[option.value].height}
 											</span>
 										) : null}
@@ -290,6 +353,71 @@ export function ExportSettingsMenu({
 					</div>
 					<div className="mb-1 flex items-center justify-between px-1">
 						<span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+							{tSettings("export.cinematicLookTitle", "Cinematic Look")}
+						</span>
+					</div>
+					<LayoutGroup id="header-export-cinematic-look">
+						<div className="mb-1.5 grid min-h-12 w-full grid-cols-3 gap-1 rounded-xl border border-foreground/5 bg-foreground/5 p-1">
+							{CINEMATIC_LOOK_PRESETS.map((preset) => {
+								const isActive = cinematicLook === preset.value;
+								return (
+									<button
+										key={preset.value}
+										type="button"
+										onClick={() => onCinematicLookChange?.(preset.value)}
+										aria-pressed={isActive}
+										className="relative rounded-lg px-1 py-1.5 text-[11px] font-medium transition-colors"
+									>
+										{isActive ? (
+											<motion.span
+												layoutId="header-export-cinematic-look-pill"
+												className="absolute inset-0 rounded-lg bg-neutral-800 dark:bg-white"
+												transition={{
+													type: "spring",
+													stiffness: 420,
+													damping: 34,
+												}}
+											/>
+										) : null}
+										<span
+											className={cn(
+												"relative z-10 flex h-full items-center justify-center text-center",
+												isActive
+													? "font-semibold text-white dark:text-black"
+													: "text-muted-foreground hover:text-foreground",
+											)}
+										>
+											{preset.label}
+										</span>
+									</button>
+								);
+							})}
+						</div>
+					</LayoutGroup>
+					<p className="mb-3 px-1 text-[10px] text-muted-foreground/70">
+						{CINEMATIC_LOOK_PRESETS.find((p) => p.value === cinematicLook)?.description}
+					</p>
+					<div className="mb-3 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-foreground/10 bg-foreground/5 px-3 py-2">
+						<div className="min-w-0">
+							<p className="text-[11px] font-semibold text-foreground">
+								{tSettings("export.cinematicLetterbox.title", "Cinematic Letterbox (21:9)")}
+							</p>
+							<p className="mt-0.5 truncate text-[10px] text-muted-foreground/75">
+								{tSettings(
+									"export.cinematicLetterbox.hint",
+									"Adds 21:9 widescreen black bars on top & bottom.",
+								)}
+							</p>
+						</div>
+						<Switch
+							checked={cinematicLetterbox}
+							onCheckedChange={onCinematicLetterboxChange}
+							aria-label="Toggle cinematic letterbox"
+							className="shrink-0 scale-75"
+						/>
+					</div>
+					<div className="mb-1 flex items-center justify-between px-1">
+						<span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
 							{tSettings("export.pipelineTitle", "Pipeline")}
 						</span>
 					</div>
@@ -359,13 +487,13 @@ export function ExportSettingsMenu({
 										{tSettings("export.nvidiaCuda.title", "NVIDIA CUDA")}
 									</span>
 									<span className="rounded bg-[#2563EB]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#2563EB]">
-										{tSettings("export.nvidiaCuda.badge", "Experimental")}
+										{tSettings("export.nvidiaCuda.badge", "GPU")}
 									</span>
 								</div>
 								<p className="mt-0.5 truncate text-[10px] text-muted-foreground/75">
 									{tSettings(
 										"export.nvidiaCuda.hint",
-										"Try GPU export on this Windows device.",
+										"Use NVIDIA GPU for faster exports.",
 									)}
 								</p>
 							</div>
@@ -374,7 +502,7 @@ export function ExportSettingsMenu({
 								onCheckedChange={onExperimentalNvidiaCudaExportChange}
 								aria-label={tSettings(
 									"export.nvidiaCuda.toggle",
-									"Enable experimental NVIDIA CUDA export",
+									"Enable NVIDIA GPU export",
 								)}
 								className="shrink-0 scale-75 data-[state=checked]:bg-[#2563EB]"
 							/>
@@ -522,26 +650,36 @@ export function ExportSettingsMenu({
 			)}
 
 			<div className="space-y-2">
-				<Button
+				<button
 					type="button"
-					size="lg"
 					onClick={onInstantExport || onExport}
-					className="h-10 w-full gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-xs font-bold text-white shadow-sm transition-all hover:from-blue-500 hover:to-indigo-500"
+					className="uiverse-btn uiverse-btn-instant uiverse-btn-full"
 				>
-					<Lightning className="h-4 w-4 fill-current text-yellow-300" />
-					<span>Instant Export (No Delay)</span>
-				</Button>
-				<Button
+					<span className="uiverse-btn-lg !py-2.5">
+						<span className="uiverse-btn-sl" />
+						<span className="uiverse-btn-text text-xs">
+							<Lightning className="h-4 w-4 fill-current text-yellow-300" />
+							<span>Instant Export (No Delay)</span>
+						</span>
+					</span>
+				</button>
+				<button
 					type="button"
-					size="lg"
 					onClick={onExport}
-					className="h-9 w-full gap-2 rounded-lg border border-foreground/10 bg-foreground/5 text-xs font-medium text-foreground transition-colors hover:bg-foreground/10"
+					className="uiverse-btn uiverse-btn-export uiverse-btn-full"
 				>
-					<Download className="h-3.5 w-3.5" />
-					{tSettings("export.exportVideo", undefined, {
-						format: exportFormat === "gif" ? "GIF" : "Video",
-					})}
-				</Button>
+					<span className="uiverse-btn-lg !py-2">
+						<span className="uiverse-btn-sl" />
+						<span className="uiverse-btn-text text-xs">
+							<Download className="h-3.5 w-3.5" />
+							<span>
+								{tSettings("export.exportVideo", undefined, {
+									format: exportFormat === "gif" ? "GIF" : "Video",
+								})}
+							</span>
+						</span>
+					</span>
+				</button>
 			</div>
 		</div>
 	);

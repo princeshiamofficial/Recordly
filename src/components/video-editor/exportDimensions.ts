@@ -96,9 +96,45 @@ export function calculateMp4ExportDimensions(
 		};
 	}
 
-	const qualityScale = quality === "medium" ? 0.6 : quality === "good" ? 0.75 : 0.9;
-	return {
-		width: normalizeEvenDimension(baseWidth * qualityScale),
-		height: normalizeEvenDimension(baseHeight * qualityScale),
-	};
+	const safeBaseWidth = normalizeEvenDimension(baseWidth);
+	const safeBaseHeight = normalizeEvenDimension(baseHeight);
+	const isLandscape = safeBaseWidth >= safeBaseHeight;
+	const aspectRatio = safeBaseHeight > 0 ? safeBaseWidth / safeBaseHeight : 16 / 9;
+
+	let targetShortSide: number;
+	switch (quality) {
+		case "8k":
+			targetShortSide = 4320;
+			break;
+		case "4k":
+			targetShortSide = 2160;
+			break;
+		case "2k":
+			targetShortSide = 1440;
+			break;
+		case "high":
+			targetShortSide = 1080;
+			break;
+		case "good":
+			targetShortSide = 720;
+			break;
+		case "medium":
+			targetShortSide = 480;
+			break;
+		default:
+			return {
+				width: safeBaseWidth,
+				height: safeBaseHeight,
+			};
+	}
+
+	if (isLandscape) {
+		const height = normalizeEvenDimension(targetShortSide);
+		const width = normalizeEvenDimension(height * aspectRatio);
+		return { width, height };
+	} else {
+		const width = normalizeEvenDimension(targetShortSide);
+		const height = normalizeEvenDimension(width / aspectRatio);
+		return { width, height };
+	}
 }

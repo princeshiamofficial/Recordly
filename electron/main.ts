@@ -47,7 +47,7 @@ import {
 } from "./updater";
 import {
 	createEditorWindow,
-	createHudOverlayWindow,
+	createDashboardWindow,
 	createSourceSelectorWindow,
 	getHudOverlayWindow,
 	getUpdateToastWindow,
@@ -308,10 +308,10 @@ function createWindow() {
 	}
 
 	isCreatingMainWindow = true;
-	const createdHudWindow = createHudOverlayWindow();
-	mainWindow = createdHudWindow;
-	createdHudWindow.once("closed", () => {
-		if (mainWindow === createdHudWindow) {
+	const createdDashboardWindow = createDashboardWindow();
+	mainWindow = createdDashboardWindow;
+	createdDashboardWindow.once("closed", () => {
+		if (mainWindow === createdDashboardWindow) {
 			mainWindow = null;
 		}
 	});
@@ -339,12 +339,12 @@ function focusOrCreateMainWindow() {
 	if (mainWindow && !mainWindow.isDestroyed()) {
 		// On Linux/Wayland, focus() often doesn't take effect (compositor ignores it). Apps like Telegram
 		// work because they receive an XDG activation token via StatusNotifierItem.ProvideXdgActivationToken;
-		// Electron's tray doesn't handle that yet. Workaround: destroy and recreate the HUD so the new
-		// window gets focus (creation path works). Only for HUD, not editor.
+		// Electron's tray doesn't handle that yet. Workaround: destroy and recreate the window so the new
+		// window gets focus (creation path works). Only for HUD, not editor or dashboard.
 		if (
 			process.platform === "linux" &&
 			!mainWindow.isFocused() &&
-			!isEditorWindow(mainWindow)
+			mainWindow === getHudOverlayWindow()
 		) {
 			const win = mainWindow;
 			mainWindow = null;
@@ -361,7 +361,7 @@ function focusOrCreateMainWindow() {
 		// and can be safely shown/restored.
 		if (
 			process.platform === "win32" &&
-			!isEditorWindow(mainWindow) &&
+			mainWindow === getHudOverlayWindow() &&
 			isHudOverlayMousePassthroughSupported()
 		) {
 			showHudOverlayFromTray();
@@ -555,22 +555,22 @@ function syncDockIcon() {
 function getUpdateNotificationTitle(payload: UpdateToastPayload) {
 	switch (payload.phase) {
 		case "available":
-			return `Recordly ${payload.version} is available`;
+			return `CamVerse ${payload.version} is available`;
 		case "downloading":
-			return `Downloading Recordly ${payload.version}`;
+			return `Downloading CamVerse ${payload.version}`;
 		case "ready":
-			return `Recordly ${payload.version} is ready`;
+			return `CamVerse ${payload.version} is ready`;
 		case "error":
-			return `Recordly ${payload.version} needs attention`;
+			return `CamVerse ${payload.version} needs attention`;
 	}
 }
 
 function getUpdateNotificationBody(payload: UpdateToastPayload) {
 	switch (payload.phase) {
 		case "available":
-			return "Click to install the update and restart Recordly.";
+			return "Click to install the update and restart CamVerse.";
 		case "downloading":
-			return "Recordly is downloading the update and will restart when it is ready.";
+			return "CamVerse is downloading the update and will restart when it is ready.";
 		case "ready":
 			return "Click to install the downloaded update and restart.";
 		case "error":
@@ -745,7 +745,7 @@ ipcMain.handle("check-for-app-updates", async () => {
 function updateTrayMenu(recording: boolean = false) {
 	if (!tray) return;
 	const trayIcon = recording ? getRecordingTrayIcon() : getDefaultTrayIcon();
-	const trayToolTip = recording ? `Recording: ${selectedSourceName}` : "Recordly";
+	const trayToolTip = recording ? `Recording: ${selectedSourceName}` : "CamVerse";
 	const menuTemplate = recording
 		? [
 				{
@@ -1022,6 +1022,7 @@ app.whenReady().then(async () => {
 
 	registerIpcHandlers(
 		createEditorWindowWrapper,
+		createDashboardWindow,
 		createSourceSelectorWindowWrapper,
 		() => mainWindow,
 		() => sourceSelectorWindow,

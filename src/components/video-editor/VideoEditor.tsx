@@ -8,6 +8,8 @@ import {
 	DownloadSimple as Download,
 	FolderOpen,
 	Gear,
+	House,
+	Lightning,
 	Pause,
 	Camera as PhCameraRegular,
 	Play,
@@ -21,7 +23,6 @@ import {
 	ArrowCounterClockwise as Undo2,
 	UserCircle as User,
 	VideoCamera,
-	Lightning,
 	SpeakerLow as Volume1,
 	SpeakerHigh as Volume2,
 	SpeakerX as VolumeX,
@@ -55,6 +56,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
 import {
 	calculateOutputDimensions,
+	type CinematicLookPreset,
 	DEFAULT_MP4_CODEC,
 	type ExportBackendPreference,
 	type ExportEncodingMode,
@@ -119,6 +121,9 @@ const PhSparkle = (props: { className?: string; weight?: "fill" | "regular" }) =
 );
 const PhSettings = (props: { className?: string; weight?: "fill" | "regular" }) => (
 	<Gear weight={props.weight ?? "regular"} className={props.className} />
+);
+const PhHouse = (props: { className?: string; weight?: "fill" | "regular" }) => (
+	<House weight={props.weight ?? "regular"} className={props.className} />
 );
 
 import type { SourceAudioTrackSettings } from "@/components/video-editor/audio/audioTypes";
@@ -640,6 +645,8 @@ export default function VideoEditor() {
 	const [exportFormat, setExportFormat] = useState<ExportFormat>(
 		initialEditorPreferences.exportFormat,
 	);
+	const [cinematicLook, setCinematicLook] = useState<CinematicLookPreset>("none");
+	const [cinematicLetterbox, setCinematicLetterbox] = useState<boolean>(false);
 	const [gifFrameRate, setGifFrameRate] = useState<GifFrameRate>(
 		initialEditorPreferences.gifFrameRate,
 	);
@@ -1520,9 +1527,12 @@ export default function VideoEditor() {
 			: desiredMp4SourceDimensions.height;
 
 		return {
-			medium: calculateMp4ExportDimensions(baseWidth, baseHeight, "medium"),
-			good: calculateMp4ExportDimensions(baseWidth, baseHeight, "good"),
+			"8k": calculateMp4ExportDimensions(baseWidth, baseHeight, "8k"),
+			"4k": calculateMp4ExportDimensions(baseWidth, baseHeight, "4k"),
+			"2k": calculateMp4ExportDimensions(baseWidth, baseHeight, "2k"),
 			high: calculateMp4ExportDimensions(baseWidth, baseHeight, "high"),
+			good: calculateMp4ExportDimensions(baseWidth, baseHeight, "good"),
+			medium: calculateMp4ExportDimensions(baseWidth, baseHeight, "medium"),
 			source: calculateMp4ExportDimensions(baseWidth, baseHeight, "source"),
 		};
 	}, [
@@ -1775,7 +1785,9 @@ export default function VideoEditor() {
 			currentProjectPath?.split(/[\\/]/).pop() ??
 			currentSourcePath?.split(/[\\/]/).pop() ??
 			"";
-		const withoutExtension = fileName.replace(/\.recordly$/i, "").replace(/\.[^.]+$/, "");
+		const withoutExtension = fileName
+			.replace(/\.(camverse|recordly|openscreen)$/i, "")
+			.replace(/\.[^.]+$/, "");
 		return withoutExtension || t("editor.project.untitled", "Untitled");
 	}, [currentProjectPath, currentSourcePath, t]);
 
@@ -4791,12 +4803,29 @@ export default function VideoEditor() {
 					});
 					const supportedSourceDimensions =
 						await ensureSupportedMp4SourceDimensions(selectedMp4FrameRate);
-					const { width: exportWidth, height: exportHeight } =
+					const { width: rawExportWidth, height: rawExportHeight } =
 						calculateMp4ExportDimensions(
 							supportedSourceDimensions.width,
 							supportedSourceDimensions.height,
 							quality,
 						);
+					const supportedExportDimensions = await probeSupportedMp4Dimensions({
+						width: rawExportWidth,
+						height: rawExportHeight,
+						frameRate: selectedMp4FrameRate,
+						codec: DEFAULT_MP4_CODEC,
+						getBitrate: (w, h) =>
+							getMp4ExportBitrate({
+								width: w,
+								height: h,
+								frameRate: selectedMp4FrameRate,
+								quality,
+								encodingMode,
+								useModernNativeStaticLayout: useExperimentalNativeExport,
+							}),
+					});
+					const exportWidth = supportedExportDimensions.width;
+					const exportHeight = supportedExportDimensions.height;
 					const bitrate = getMp4ExportBitrate({
 						width: exportWidth,
 						height: exportHeight,
@@ -4818,10 +4847,14 @@ export default function VideoEditor() {
 						bitrate,
 						codec: DEFAULT_MP4_CODEC,
 						encodingMode,
-						preferredEncoderPath: supportedSourceDimensions.encoderPath,
+						preferredEncoderPath:
+							supportedExportDimensions.encoderPath ??
+							supportedSourceDimensions.encoderPath,
 						preferredRenderBackend: smokeExportConfig.renderBackend,
 						experimentalNativeExport: useExperimentalNativeExport,
 						experimentalNvidiaCudaExport: useExperimentalNvidiaCudaExport,
+						cinematicLook: settings.cinematicLook ?? cinematicLook,
+						cinematicLetterbox: settings.cinematicLetterbox ?? cinematicLetterbox,
 						maxEncodeQueue: smokeExportConfig.maxEncodeQueue,
 						maxDecodeQueue: smokeExportConfig.maxDecodeQueue,
 						maxPendingFrames: smokeExportConfig.maxPendingFrames,
@@ -5328,6 +5361,8 @@ export default function VideoEditor() {
 			mp4FrameRate,
 			exportBackendPreference,
 			exportPipelineModel,
+			cinematicLook,
+			cinematicLetterbox,
 			gifFrameRate,
 			gifLoop,
 			gifSizePreset,
@@ -5343,6 +5378,8 @@ export default function VideoEditor() {
 		exportEncodingMode,
 		exportQuality,
 		mp4FrameRate,
+		cinematicLook,
+		cinematicLetterbox,
 		gifFrameRate,
 		gifLoop,
 		gifSizePreset,
@@ -5379,6 +5416,8 @@ export default function VideoEditor() {
 			mp4FrameRate,
 			exportBackendPreference: "auto",
 			exportPipelineModel: "modern",
+			cinematicLook,
+			cinematicLetterbox,
 			gifFrameRate,
 			gifLoop,
 			gifSizePreset,
@@ -5394,6 +5433,8 @@ export default function VideoEditor() {
 		includeCaptionSidecar,
 		exportQuality,
 		mp4FrameRate,
+		cinematicLook,
+		cinematicLetterbox,
 		gifFrameRate,
 		gifLoop,
 		gifSizePreset,
@@ -5692,7 +5733,7 @@ export default function VideoEditor() {
 						<DialogDescription className="text-muted-foreground">
 							{t(
 								"editor.project.saveDescription",
-								"Name this project. It will be saved in your Recordly Projects folder.",
+								"Name this project. It will be saved in your CamVerse Projects folder.",
 							)}
 						</DialogDescription>
 					</DialogHeader>
@@ -5710,7 +5751,7 @@ export default function VideoEditor() {
 								aria-label={t("editor.project.saveNameLabel", "Project name")}
 							/>
 							<span className="shrink-0 px-3 text-xs font-medium text-muted-foreground/70">
-								.recordly
+								.camverse
 							</span>
 						</div>
 					</div>
@@ -5806,7 +5847,7 @@ export default function VideoEditor() {
 					<DialogDescription className="text-muted-foreground">
 						{t(
 							"editor.nativeCaptureUnavailable.description",
-							"Your device does not support native capture. This could be for a variety of reasons we haven’t figured out yet. This doesn’t break Recordly, but it does make cursor smoothing impossible.",
+							"Your device does not support native capture. This could be for a variety of reasons we haven’t figured out yet. This doesn’t break CamVerse, but it does make cursor smoothing impossible.",
 						)}
 					</DialogDescription>
 				</DialogHeader>
@@ -5911,7 +5952,7 @@ export default function VideoEditor() {
 								toast.info(
 									t(
 										"editor.header.recordNewWebNotice",
-										"Please use the Recordly Desktop App to start a new recording.",
+										"Please use the CamVerse Desktop App to start a new recording.",
 									),
 								);
 							}
@@ -5961,7 +6002,7 @@ export default function VideoEditor() {
 								aria-label={t("editor.project.renameInput", "Project name")}
 							/>
 							<span className="shrink-0 text-xs font-medium tracking-tight text-muted-foreground/70">
-								.recordly
+								.camverse
 							</span>
 						</form>
 					) : (
@@ -5979,7 +6020,7 @@ export default function VideoEditor() {
 								{projectDisplayName}
 							</span>
 							<span className="shrink-0 text-xs font-medium tracking-tight text-muted-foreground/70">
-								.recordly
+								.camverse
 							</span>
 						</button>
 					)}
@@ -6116,10 +6157,10 @@ export default function VideoEditor() {
 							</div>
 						</PopoverContent>
 					</Popover>
-					<Button
+					<button
 						type="button"
 						onClick={handleInstantExport}
-						className="mr-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-[5px] bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white transition-all hover:opacity-90 shadow-sm"
+						className="cybrejon-btn cybrejon-btn-instant mr-2"
 						title={t(
 							"editor.header.instantExportTitle",
 							"Instant export without delay",
@@ -6127,23 +6168,23 @@ export default function VideoEditor() {
 					>
 						<Lightning className="h-3.5 w-3.5 fill-current text-yellow-300" />
 						<span>Instant Export</span>
-					</Button>
+					</button>
 					<DropdownMenu
 						open={showExportDropdown}
 						onOpenChange={setShowExportDropdown}
 						modal={false}
 					>
 						<DropdownMenuTrigger asChild>
-							<Button
+							<button
 								type="button"
 								onClick={handleOpenExportDropdown}
-								className="inline-flex h-8 min-w-[112px] items-center justify-center gap-2 rounded-[5px] bg-[#2563EB] px-4.5 text-white transition-colors hover:bg-[#2563EB]/92"
+								className="cybrejon-btn cybrejon-btn-export"
 							>
-								<Download className="h-4 w-4" />
-								<span className="text-sm font-semibold tracking-tight">
+								<Download className="h-3.5 w-3.5" />
+								<span>
 									{t("common.actions.export", "Export")}
 								</span>
-							</Button>
+							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent
 							align="end"
@@ -6320,6 +6361,10 @@ export default function VideoEditor() {
 										setExperimentalNvidiaCudaExport
 									}
 									nvidiaCudaExportAvailable={nvidiaCudaExportAvailable}
+									cinematicLook={cinematicLook}
+									onCinematicLookChange={setCinematicLook}
+									cinematicLetterbox={cinematicLetterbox}
+									onCinematicLetterboxChange={setCinematicLetterbox}
 									exportQuality={exportQuality}
 									onExportQualityChange={setExportQuality}
 									gifFrameRate={gifFrameRate}
@@ -6417,6 +6462,17 @@ export default function VideoEditor() {
 								);
 							})}
 							<div className="mt-auto flex flex-col items-center gap-0.5 pt-3">
+								<motion.button
+									type="button"
+									onClick={() => window.electronAPI?.switchToDashboard?.()}
+									title="Dashboard"
+									className="group relative flex h-9 w-9 items-center justify-center rounded-lg text-foreground/55 outline-none transition hover:text-foreground focus:outline-none focus-visible:outline-none"
+									whileHover={{ opacity: 1 }}
+									initial={{ opacity: 0.55 }}
+								>
+									<motion.span className="absolute inset-0 rounded-lg bg-foreground/[0.04] opacity-0 transition group-hover:opacity-100" />
+									<PhHouse className="relative z-10 h-[22px] w-[22px]" />
+								</motion.button>
 								<motion.button
 									type="button"
 									onClick={() => toast.info("Account coming soon")}

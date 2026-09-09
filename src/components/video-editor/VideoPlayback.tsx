@@ -698,6 +698,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 								preference: backend,
 								autoStart: true,
 								sharedTicker: false,
+								roundPixels: false,
 							},
 							PIXI_RENDERER_INIT_TIMEOUT_MS,
 							backend,
@@ -1690,8 +1691,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				return;
 			}
 
-			videoEffectsContainer.filters =
-				(zoomMotionBlurRef.current ?? 0) > 0 ? [motionBlurFilter, zoomBlurFilter] : null;
+			videoEffectsContainer.filters = null;
 			motionBlurFilter.velocity = { x: 0, y: 0 };
 			motionBlurFilter.kernelSize = 5;
 			motionBlurFilter.offset = 0;
@@ -1807,8 +1807,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			}
 
 			motionBlurStateRef.current = createMotionBlurState();
-			videoEffectsContainer.filters =
-				zoomMotionBlur > 0 ? [motionBlurFilter, zoomBlurFilter] : null;
+			videoEffectsContainer.filters = null;
 		}, [videoPath, zoomMotionBlur]);
 
 		useEffect(() => {
@@ -2153,10 +2152,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				videoEffectsContainerRef.current = videoEffectsContainer;
 				zoomBlurFilterRef.current = new ZoomBlurFilter({ strength: 0, maxKernelSize: 13 });
 				motionBlurFilterRef.current = new MotionBlurFilter([0, 0], 5, 0);
-				videoEffectsContainer.filters = [
-					motionBlurFilterRef.current,
-					zoomBlurFilterRef.current,
-				];
+				videoEffectsContainer.filters = null;
 				cameraContainer.addChild(videoEffectsContainer);
 				syncPreviewMotionBlurQuality();
 
@@ -2281,7 +2277,11 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			if ("autoUpdate" in source) {
 				(source as { autoUpdate?: boolean }).autoUpdate = true;
 			}
+			source.style.scaleMode = "linear";
+			source.style.addressMode = "clamp-to-edge";
 			const videoTexture = Texture.from(source);
+			videoTexture.source.style.scaleMode = "linear";
+			videoTexture.source.style.addressMode = "clamp-to-edge";
 
 			const videoSprite = new Sprite(videoTexture);
 			videoSpriteRef.current = videoSprite;
@@ -2365,6 +2365,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 
 				const appliedTransform = applyZoomTransform({
 					cameraContainer,
+					videoEffectsContainer: videoEffectsContainerRef.current,
 					zoomBlurFilter: zoomBlurFilterRef.current,
 					motionBlurFilter: motionBlurFilterRef.current,
 					stageSize: stageSizeRef.current,

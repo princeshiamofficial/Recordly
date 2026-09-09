@@ -198,6 +198,10 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
 		return null;
 	}
 
+	const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+	if (app.renderer.resolution !== dpr) {
+		app.renderer.resolution = dpr;
+	}
 	app.renderer.resize(width, height);
 	app.canvas.style.width = "100%";
 	app.canvas.style.height = "100%";

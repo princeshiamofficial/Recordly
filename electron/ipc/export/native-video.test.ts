@@ -413,7 +413,7 @@ describe("getNativeExportCapabilities", () => {
 });
 
 describe("getExperimentalNvidiaCudaExportSkipReason", () => {
-	it("requires user opt-in before packaged CUDA candidates run", async () => {
+	it("runs packaged CUDA candidates by default when the helper and an NVIDIA GPU are present", async () => {
 		const reason = await withPackagedCudaCandidate(
 			{ gpuDevice: [{ vendorId: 0x10de, deviceString: "NVIDIA GeForce GTX 1650" }] },
 			() =>
@@ -424,7 +424,7 @@ describe("getExperimentalNvidiaCudaExportSkipReason", () => {
 				),
 		);
 
-		expect(reason).toBe(process.platform === "win32" ? "env-disabled" : "not-windows");
+		expect(reason).toBe(process.platform === "win32" ? null : "not-windows");
 	});
 
 	it("allows user opt-in CUDA candidates when the helper and an NVIDIA GPU are present", async () => {
@@ -523,12 +523,14 @@ describe("getExperimentalNvidiaCudaExportSkipReason", () => {
 		}
 	});
 
-	it("skips user opt-in CUDA candidates when Electron reports no NVIDIA GPU", async () => {
+	it("skips default CUDA candidates when Electron reports no NVIDIA GPU", async () => {
 		const reason = await withPackagedCudaCandidate(
 			{ gpuDevice: [{ vendorId: 0x8086, deviceString: "Intel UHD Graphics" }] },
 			() =>
 				getExperimentalNvidiaCudaExportSkipReason(
-					createNvidiaCudaSkipOptions({ experimentalNvidiaCudaExport: true }),
+					createNvidiaCudaSkipOptions({
+						audioOptions: { audioMode: "copy-source", audioSourcePath: "input.mp4" },
+					}),
 				),
 		);
 
@@ -950,6 +952,33 @@ describe("buildNativeVideoAudioMuxArgs", () => {
 		expect(args).toEqual(
 			expect.arrayContaining(["-stats_period", "0.5", "-progress", "pipe:2", "-nostats"]),
 		);
+	});
+
+	it("applies video filter and libx264 re-encoding when cinematic look or letterbox is requested", () => {
+		const args = buildNativeVideoAudioMuxArgs("video.mp4", "source.mp4", "out.mp4", {
+			audioMode: "copy-source",
+			audioSourceCodec: "aac",
+			cinematicLook: "cinematic",
+			cinematicLetterbox: true,
+		});
+
+		expect(args).toContain("-vf");
+		const vfIndex = args.indexOf("-vf");
+		expect(args[vfIndex + 1]).toContain("curves=r='0/0 0.5/0.56 1/1'");
+		expect(args[vfIndex + 1]).toContain("drawbox=x=0:y=0:w=iw:h=trunc(ih*0.125)");
+		expect(args).toEqual(expect.arrayContaining(["-c:v", "libx264"]));
+	});
+
+	it("keeps -c:v copy when no cinematic filter or letterbox is requested", () => {
+		const args = buildNativeVideoAudioMuxArgs("video.mp4", "source.mp4", "out.mp4", {
+			audioMode: "copy-source",
+			audioSourceCodec: "aac",
+			cinematicLook: "none",
+			cinematicLetterbox: false,
+		});
+
+		expect(args).toEqual(expect.arrayContaining(["-c:v", "copy"]));
+		expect(args).not.toContain("-vf");
 	});
 });
 

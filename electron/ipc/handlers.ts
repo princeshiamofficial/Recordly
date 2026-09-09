@@ -52,6 +52,7 @@ export function killWindowsCaptureProcess() {
 
 export function registerIpcHandlers(
 	createEditorWindow: () => void,
+	createDashboardWindow: () => void,
 	createSourceSelectorWindow: () => BrowserWindow,
 	_getMainWindow: () => BrowserWindow | null,
 	getSourceSelectorWindow: () => BrowserWindow | null,
@@ -59,6 +60,7 @@ export function registerIpcHandlers(
 ) {
 	registerSourceHandlers({
 		createEditorWindow,
+		createDashboardWindow,
 		createSourceSelectorWindow,
 		getSourceSelectorWindow,
 	});

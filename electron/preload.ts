@@ -226,6 +226,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			error?: string;
 		}>;
 	},
+	getDetectedEncoderInfo: () => {
+		return ipcRenderer.invoke("get-detected-encoder-info") as Promise<{
+			success: boolean;
+			info?: {
+				encoderName: string;
+				isHardware: boolean;
+				displayName: string;
+				gpuModel?: string;
+				platform: string;
+			};
+			error?: string;
+		}>;
+	},
 	nativeStaticLayoutExport: (options: {
 		sessionId?: string;
 		inputPath: string;
@@ -328,6 +341,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		bitrate: number;
 		encodingMode: "fast" | "balanced" | "quality";
 		inputMode?: "rawvideo" | "h264-stream";
+		vflip?: boolean;
 	}) => {
 		return ipcRenderer.invoke("native-video-export-start", options);
 	},
@@ -378,6 +392,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 			editedAudioData?: ArrayBuffer;
 			editedAudioMimeType?: string | null;
+			cinematicLook?: string | null;
+			cinematicLetterbox?: boolean | null;
 		},
 	) => {
 		return ipcRenderer
@@ -400,6 +416,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			}) as Promise<{
 			success: boolean;
 			data?: Uint8Array;
+			tempPath?: string;
 			encoderName?: string;
 			error?: string;
 			metrics?: NativeVideoAudioMuxMetrics;
@@ -426,6 +443,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 			editedAudioData?: ArrayBuffer;
 			editedAudioMimeType?: string | null;
+			cinematicLook?: string | null;
+			cinematicLetterbox?: boolean | null;
 		},
 	) => {
 		return ipcRenderer.invoke("mux-exported-video-audio", videoData, options) as Promise<{
@@ -448,6 +467,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			editedTrackSegments?: Array<{ startMs: number; endMs: number; speed: number }>;
 			editedAudioData?: ArrayBuffer;
 			editedAudioMimeType?: string | null;
+			cinematicLook?: string | null;
+			cinematicLetterbox?: boolean | null;
 		},
 	) => {
 		return ipcRenderer.invoke("mux-exported-video-audio-from-path", videoPath, options);
@@ -488,6 +509,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	switchToEditor: () => {
 		return ipcRenderer.invoke("switch-to-editor");
 	},
+	switchToDashboard: () => {
+		return ipcRenderer.invoke("switch-to-dashboard");
+	},
 	openSourceSelector: () => {
 		return ipcRenderer.invoke("open-source-selector");
 	},
@@ -515,6 +539,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			capturesMicrophone?: boolean;
 			microphoneDeviceId?: string;
 			microphoneLabel?: string;
+			recordingQuality?: number;
 		},
 	) => {
 		return ipcRenderer.invoke("start-native-screen-recording", source, options);
@@ -978,6 +1003,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		microphoneEnabled?: boolean;
 		microphoneDeviceId?: string;
 		systemAudioEnabled?: boolean;
+		recordingQuality?: number;
 	}) => ipcRenderer.invoke("set-recording-preferences", prefs),
 	getCountdownDelay: () => ipcRenderer.invoke("get-countdown-delay"),
 	setCountdownDelay: (delay: number) => ipcRenderer.invoke("set-countdown-delay", delay),

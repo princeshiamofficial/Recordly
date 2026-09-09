@@ -154,6 +154,8 @@ export function registerSettingsHandlers() {
 						? parsed.microphoneDeviceId
 						: undefined,
 				systemAudioEnabled: parsed.systemAudioEnabled === true,
+				recordingQuality:
+					typeof parsed.recordingQuality === "number" ? parsed.recordingQuality : 2,
 			};
 		} catch {
 			return {
@@ -161,6 +163,7 @@ export function registerSettingsHandlers() {
 				microphoneEnabled: false,
 				microphoneDeviceId: undefined,
 				systemAudioEnabled: false,
+				recordingQuality: 2,
 			};
 		}
 	});
@@ -177,6 +180,7 @@ export function registerSettingsHandlers() {
 				microphoneEnabled?: boolean;
 				microphoneDeviceId?: string;
 				systemAudioEnabled?: boolean;
+				recordingQuality?: number;
 			},
 		) => {
 			try {

@@ -1085,9 +1085,12 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 		exportBackendPreference: normalizeExportBackendPreference(editor.exportBackendPreference),
 		exportPipelineModel: normalizeExportPipelineModel(editor.exportPipelineModel),
 		exportQuality:
-			editor.exportQuality === "medium" ||
-			editor.exportQuality === "good" ||
+			editor.exportQuality === "8k" ||
+			editor.exportQuality === "4k" ||
+			editor.exportQuality === "2k" ||
 			editor.exportQuality === "high" ||
+			editor.exportQuality === "good" ||
+			editor.exportQuality === "medium" ||
 			editor.exportQuality === "source"
 				? editor.exportQuality
 				: "source",

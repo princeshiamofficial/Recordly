@@ -102,9 +102,20 @@ describe("export bitrate policy", () => {
 				encodingMode: "fast",
 				useModernNativeStaticLayout: true,
 			}),
-		).toBe(3_000_000);
+		).toBe(13_500_000);
 	});
 
+	it("keeps fast mode above a legible screen-text floor", () => {
+		expect(
+			getMp4ExportBitrate({
+				width: 1920,
+				height: 1080,
+				frameRate: 60,
+				quality: "source",
+				encodingMode: "fast",
+			}),
+		).toBe(19_091_883);
+	});
 	it("scales the modern native cap with output pixel rate", () => {
 		expect(
 			getMp4ExportBitrate({
@@ -116,5 +127,18 @@ describe("export bitrate policy", () => {
 				useModernNativeStaticLayout: true,
 			}),
 		).toBe(72_000_000);
+	});
+
+	it("provides dedicated high-bandwidth 8K bitrate for ultra-high-res exports", () => {
+		expect(getSourceQualityBitrate(7680, 4320)).toBe(120_000_000);
+		expect(
+			getMp4ExportBitrate({
+				width: 7680,
+				height: 4320,
+				frameRate: 30,
+				quality: "source",
+				encodingMode: "quality",
+			}),
+		).toBe(120_000_000);
 	});
 });

@@ -43,23 +43,45 @@ function getFallbackReadbackContext(
 	return fallbackContext;
 }
 
-function captureCanvasFrameWithReadback(
-	canvas: HTMLCanvasElement,
-	targetWidth?: number,
-	targetHeight?: number,
-): Uint8Array {
-	const outWidth = targetWidth ?? canvas.width;
-	const outHeight = targetHeight ?? canvas.height;
-	const context = getFallbackReadbackContext(outWidth, outHeight);
-	context.clearRect(0, 0, outWidth, outHeight);
-	context.drawImage(canvas, 0, 0, outWidth, outHeight);
-	const imageData = context.getImageData(0, 0, outWidth, outHeight);
-	return new Uint8Array(imageData.data);
+const BUFFER_POOL_MAX_CAPACITY = 48;
+const frameBufferPool = new Map<number, Uint8Array[]>();
+let reusableScratchRow: Uint8Array | null = null;
+
+export function acquireNativeFrameBuffer(byteLength: number): Uint8Array {
+	const pool = frameBufferPool.get(byteLength);
+	if (pool && pool.length > 0) {
+		return pool.pop()!;
+	}
+	return new Uint8Array(byteLength);
+}
+
+export function releaseNativeFrameBuffer(buffer: Uint8Array): void {
+	const byteLength = buffer.byteLength;
+	let pool = frameBufferPool.get(byteLength);
+	if (!pool) {
+		pool = [];
+		frameBufferPool.set(byteLength, pool);
+	}
+	if (pool.length < BUFFER_POOL_MAX_CAPACITY) {
+		pool.push(buffer);
+	}
+}
+
+export function clearNativeFrameBufferPool(): void {
+	frameBufferPool.clear();
+	reusableScratchRow = null;
+}
+
+function getScratchRow(rowByteLength: number): Uint8Array {
+	if (!reusableScratchRow || reusableScratchRow.byteLength < rowByteLength) {
+		reusableScratchRow = new Uint8Array(rowByteLength);
+	}
+	return reusableScratchRow.subarray(0, rowByteLength);
 }
 
 function flipRgbaRowsInPlace(buffer: Uint8Array, width: number, height: number): void {
 	const rowByteLength = width * RGBA_BYTES_PER_PIXEL;
-	const scratchRow = new Uint8Array(rowByteLength);
+	const scratchRow = getScratchRow(rowByteLength);
 	const halfRows = Math.floor(height / 2);
 
 	for (let rowIndex = 0; rowIndex < halfRows; rowIndex += 1) {
@@ -72,18 +94,43 @@ function flipRgbaRowsInPlace(buffer: Uint8Array, width: number, height: number):
 	}
 }
 
+function captureCanvasFrameWithReadback(
+	canvas: HTMLCanvasElement,
+	targetWidth?: number,
+	targetHeight?: number,
+	destBuffer?: Uint8Array,
+): Uint8Array {
+	const outWidth = targetWidth ?? canvas.width;
+	const outHeight = targetHeight ?? canvas.height;
+	const context = getFallbackReadbackContext(outWidth, outHeight);
+	context.clearRect(0, 0, outWidth, outHeight);
+	context.drawImage(canvas, 0, 0, outWidth, outHeight);
+	const imageData = context.getImageData(0, 0, outWidth, outHeight);
+	const target =
+		destBuffer && destBuffer.byteLength === imageData.data.byteLength
+			? destBuffer
+			: acquireNativeFrameBuffer(imageData.data.byteLength);
+	target.set(imageData.data);
+	return target;
+}
+
 export async function captureCanvasFrameForNativeExport(
 	canvas: HTMLCanvasElement,
 	timestamp: number,
 	flipVertical = false,
 	targetWidth?: number,
 	targetHeight?: number,
+	existingBuffer?: Uint8Array,
 ): Promise<Uint8Array> {
 	const outWidth = targetWidth ?? canvas.width;
 	const outHeight = targetHeight ?? canvas.height;
+	const neededBytes = getRgbaByteSize(outWidth, outHeight);
+	const buffer =
+		existingBuffer && existingBuffer.byteLength === neededBytes
+			? existingBuffer
+			: acquireNativeFrameBuffer(neededBytes);
 
 	if (nativeFrameCaptureMode !== "canvas-readback") {
-		const buffer = new Uint8Array(getRgbaByteSize(outWidth, outHeight));
 		const frame = new VideoFrame(canvas, { timestamp });
 
 		try {
@@ -110,9 +157,9 @@ export async function captureCanvasFrameForNativeExport(
 		}
 	}
 
-	const buffer = captureCanvasFrameWithReadback(canvas, outWidth, outHeight);
+	const fallbackResult = captureCanvasFrameWithReadback(canvas, outWidth, outHeight, buffer);
 	if (flipVertical) {
-		flipRgbaRowsInPlace(buffer, outWidth, outHeight);
+		flipRgbaRowsInPlace(fallbackResult, outWidth, outHeight);
 	}
-	return buffer;
+	return fallbackResult;
 }

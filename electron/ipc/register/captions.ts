@@ -31,7 +31,7 @@ export function registerCaptionHandlers() {
 					...(includeProjects
 						? [
 								{
-									name: "Media or Recordly Projects",
+									name: "Media or CamVerse Projects",
 									extensions: [
 										...VIDEO_FILE_EXTENSIONS,
 										...PROJECT_FILE_EXTENSIONS,
@@ -41,7 +41,7 @@ export function registerCaptionHandlers() {
 						: []),
 					{ name: "Video Files", extensions: VIDEO_FILE_EXTENSIONS },
 					...(includeProjects
-						? [{ name: "Recordly Projects", extensions: PROJECT_FILE_EXTENSIONS }]
+						? [{ name: "CamVerse Projects", extensions: PROJECT_FILE_EXTENSIONS }]
 						: []),
 					{ name: "All Files", extensions: ["*"] },
 				],

@@ -78,6 +78,11 @@ import {
 	type SupportedMp4EncoderPath,
 } from "./mp4Support";
 import { VideoMuxer } from "./muxer";
+import {
+	captureCanvasFrameForNativeExport,
+	clearNativeFrameBufferPool,
+	releaseNativeFrameBuffer,
+} from "./nativeFrameCapture";
 import { roundNativeStaticLayoutContentSize } from "./nativeStaticLayoutGeometry";
 import { buildNativeStaticLayoutCursorTelemetry } from "./nativeStaticLayoutTelemetry";
 import { resolveSourceAudioFallbackPaths } from "./sourceAudioFallback";
@@ -338,6 +343,7 @@ export class ModernVideoExporter {
 	private nativeStaticLayoutSkipReason: string | null = null;
 	private nativeStaticLayoutSkipReasons: string[] = [];
 	private nativeStaticLayoutBackgroundSkipReason: string | null = null;
+	private nativeInputMode: "h264-stream" | "rawvideo" = "h264-stream";
 	private nativeH264Encoder: VideoEncoder | null = null;
 	private nativeEncoderError: Error | null = null;
 	private effectiveDurationSec = 0;
@@ -2596,14 +2602,46 @@ export class ModernVideoExporter {
 			return false;
 		}
 
+		// First, try H.264 stream mode IF WebCodecs hardware Annex B is supported
+		let canUseH264Stream = false;
 		if (
-			typeof VideoEncoder === "undefined" ||
-			typeof VideoEncoder.isConfigSupported !== "function"
+			typeof VideoEncoder !== "undefined" &&
+			typeof VideoEncoder.isConfigSupported === "function"
 		) {
-			this.lastNativeExportError = `${NATIVE_EXPORT_ENGINE_NAME} export requires WebCodecs VideoEncoder support.`;
-			return false;
+			const encoderConfig: VideoEncoderConfig = {
+				codec: "avc1.640034",
+				width: this.config.width,
+				height: this.config.height,
+				bitrate: this.config.bitrate,
+				framerate: this.config.frameRate,
+				hardwareAcceleration: "prefer-hardware",
+				avc: { format: "annexb" },
+			};
+			try {
+				const support = await VideoEncoder.isConfigSupported(encoderConfig);
+				if (
+					support.supported &&
+					support.config?.hardwareAcceleration !== "prefer-software"
+				) {
+					canUseH264Stream = true;
+				}
+			} catch {
+				canUseH264Stream = false;
+			}
 		}
 
+		if (canUseH264Stream) {
+			const started = await this.startH264StreamNativeExport();
+			if (started) {
+				return true;
+			}
+		}
+
+		// If hardware H.264 stream is not available or failed, use direct raw frame native export via FFmpeg
+		return await this.startRawVideoNativeExport();
+	}
+
+	private async startH264StreamNativeExport(): Promise<boolean> {
 		const encoderConfig: VideoEncoderConfig = {
 			codec: "avc1.640034",
 			width: this.config.width,
@@ -2613,21 +2651,6 @@ export class ModernVideoExporter {
 			hardwareAcceleration: "prefer-hardware",
 			avc: { format: "annexb" },
 		};
-
-		try {
-			const support = await VideoEncoder.isConfigSupported(encoderConfig);
-			if (!support.supported) {
-				this.lastNativeExportError = `H.264 Annex B encoding is not supported at ${this.config.width}x${this.config.height}.`;
-				return false;
-			}
-		} catch (error) {
-			this.lastNativeExportError = error instanceof Error ? error.message : String(error);
-			console.warn(
-				`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} encoder support check failed`,
-				error,
-			);
-			return false;
-		}
 
 		const result = await window.electronAPI.nativeVideoExportStart({
 			width: this.config.width,
@@ -2642,14 +2665,11 @@ export class ModernVideoExporter {
 			this.lastNativeExportError =
 				result.error ||
 				`${NATIVE_EXPORT_ENGINE_NAME} export could not be started on this system.`;
-			console.warn(
-				`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} export unavailable`,
-				result.error,
-			);
 			return false;
 		}
 
 		this.nativeExportSessionId = result.sessionId;
+		this.nativeInputMode = "h264-stream";
 		this.lastNativeExportError = null;
 		this.encodeBackend = "ffmpeg";
 		this.encoderName = "h264-stream-copy";
@@ -2687,19 +2707,62 @@ export class ModernVideoExporter {
 			}
 			this.nativeExportSessionId = null;
 			await window.electronAPI.nativeVideoExportCancel?.(sessionId);
-			console.warn(
-				`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} encoder configure failed`,
-				error,
-			);
 			return false;
 		}
 
 		this.nativeH264Encoder = encoder;
-
 		console.log(`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} session ready (H264-stream)`, {
 			sessionId: result.sessionId,
 		});
 		return true;
+	}
+
+	private async startRawVideoNativeExport(): Promise<boolean> {
+		try {
+			const result = await window.electronAPI.nativeVideoExportStart({
+				width: this.config.width,
+				height: this.config.height,
+				frameRate: this.config.frameRate,
+				bitrate: this.config.bitrate,
+				encodingMode: this.config.encodingMode ?? "balanced",
+				inputMode: "rawvideo",
+				vflip: false,
+			});
+
+			if (!result.success || !result.sessionId) {
+				this.lastNativeExportError =
+					result.error ||
+					`${NATIVE_EXPORT_ENGINE_NAME} raw export could not be started on this system.`;
+				console.warn(
+					`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} raw export unavailable`,
+					result.error,
+				);
+				return false;
+			}
+
+			this.nativeExportSessionId = result.sessionId;
+			this.nativeInputMode = "rawvideo";
+			this.lastNativeExportError = null;
+			this.encodeBackend = "ffmpeg";
+			this.encoderName = result.encoderName || "ffmpeg-rawvideo";
+			this.pendingNativeWriteChunks = [];
+			this.pendingNativeWriteBytes = 0;
+			this.nativeH264Encoder = null;
+			this.nativeEncoderError = null;
+
+			console.log(`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} session ready (rawvideo)`, {
+				sessionId: result.sessionId,
+				encoderName: this.encoderName,
+			});
+			return true;
+		} catch (error) {
+			this.lastNativeExportError = error instanceof Error ? error.message : String(error);
+			console.warn(
+				`[VideoExporter] ${NATIVE_EXPORT_ENGINE_NAME} raw export start failed`,
+				error,
+			);
+			return false;
+		}
 	}
 
 	private async encodeRenderedFrameNative(
@@ -2707,16 +2770,39 @@ export class ModernVideoExporter {
 		frameDuration: number,
 		frameIndex: number,
 	): Promise<void> {
-		if (!this.nativeH264Encoder || !this.nativeExportSessionId) {
+		if (!this.nativeExportSessionId) {
 			if (this.cancelled) return;
 			throw new Error(`${NATIVE_EXPORT_ENGINE_NAME} export session is not active`);
 		}
 		if (this.nativeEncoderError) throw this.nativeEncoderError;
+		if (this.nativeWriteError) throw this.nativeWriteError;
+
 		while (this.nativeWritePromises.size >= this.maxNativeWriteInFlight) {
 			await this.awaitOldestNativeWrite();
 			if (this.cancelled) return;
 			if (this.nativeEncoderError) throw this.nativeEncoderError;
+			if (this.nativeWriteError) throw this.nativeWriteError;
 		}
+
+		const canvas = this.renderer!.getCanvas();
+
+		if (this.nativeInputMode === "rawvideo") {
+			const frameBuffer = await captureCanvasFrameForNativeExport(
+				canvas,
+				timestamp,
+				false,
+				this.config.width,
+				this.config.height,
+			);
+			this.queueNativeWriteChunk(this.nativeExportSessionId, frameBuffer);
+			return;
+		}
+
+		if (!this.nativeH264Encoder) {
+			if (this.cancelled) return;
+			throw new Error(`${NATIVE_EXPORT_ENGINE_NAME} H.264 encoder is not active`);
+		}
+
 		while (
 			this.nativeH264Encoder.encodeQueueSize >= ModernVideoExporter.NATIVE_ENCODER_QUEUE_LIMIT
 		) {
@@ -2724,7 +2810,7 @@ export class ModernVideoExporter {
 			if (this.cancelled) return;
 			if (this.nativeEncoderError) throw this.nativeEncoderError;
 		}
-		const canvas = this.renderer!.getCanvas();
+
 		const frame = new VideoFrame(canvas, {
 			timestamp,
 			duration: frameDuration,
@@ -2797,6 +2883,8 @@ export class ModernVideoExporter {
 							: undefined,
 					editedAudioData: editedAudioBuffer,
 					editedAudioMimeType,
+					cinematicLook: this.config.cinematicLook,
+					cinematicLetterbox: this.config.cinematicLetterbox,
 				}),
 				`${NATIVE_EXPORT_ENGINE_NAME} export finalization`,
 				audioPlan.audioMode === "none" ? "default" : "audio",
@@ -2881,6 +2969,8 @@ export class ModernVideoExporter {
 			outputDurationSec: this.effectiveDurationSec,
 			editedAudioData: editedAudioBuffer,
 			editedAudioMimeType,
+			cinematicLook: this.config.cinematicLook,
+			cinematicLetterbox: this.config.cinematicLetterbox,
 		};
 
 		if (videoSource.mode === "stream") {
@@ -3049,11 +3139,17 @@ export class ModernVideoExporter {
 		}
 
 		const chunks = this.pendingNativeWriteChunks;
+		const isRawVideo = this.nativeInputMode === "rawvideo";
 		this.pendingNativeWriteChunks = [];
 		this.pendingNativeWriteBytes = 0;
 		const writePromise = window.electronAPI
 			.nativeVideoExportWriteFrames(sessionId, chunks)
 			.then((writeResult) => {
+				if (isRawVideo) {
+					for (const chunk of chunks) {
+						releaseNativeFrameBuffer(chunk);
+					}
+				}
 				if (!writeResult.success && !this.cancelled) {
 					throw new Error(
 						writeResult.error || "Failed to write H.264 chunks to native encoder",
@@ -3061,6 +3157,11 @@ export class ModernVideoExporter {
 				}
 			})
 			.catch((error) => {
+				if (isRawVideo) {
+					for (const chunk of chunks) {
+						releaseNativeFrameBuffer(chunk);
+					}
+				}
 				if (!this.cancelled) {
 					const resolvedError = error instanceof Error ? error : new Error(String(error));
 					if (!this.nativeEncoderError) {
@@ -3556,6 +3657,7 @@ export class ModernVideoExporter {
 		this.audioProcessor?.cancel();
 		this.audioProcessor = null;
 		this.disposeNativeH264Encoder();
+		clearNativeFrameBufferPool();
 		const nativeExportSessionId = this.nativeExportSessionId;
 		this.nativeExportSessionId = null;
 		if (nativeExportSessionId && typeof window !== "undefined") {
