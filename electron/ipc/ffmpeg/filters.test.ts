@@ -3,9 +3,33 @@ import { describe, expect, it } from "vitest";
 import {
 	appendSyncedAudioFilter,
 	applyRecordedAudioStartDelay,
+	buildAtempoFilters,
 	buildCinematicVideoFilter,
 	getAudioSyncAdjustment,
 } from "./filters";
+
+describe("buildAtempoFilters", () => {
+	it("returns empty array for invalid, negative, or unity tempo", () => {
+		expect(buildAtempoFilters(1)).toEqual([]);
+		expect(buildAtempoFilters(0)).toEqual([]);
+		expect(buildAtempoFilters(-1)).toEqual([]);
+		expect(buildAtempoFilters(Number.NaN)).toEqual([]);
+	});
+
+	it("handles simple tempo within [0.5, 2.0]", () => {
+		expect(buildAtempoFilters(1.5)).toEqual(["atempo=1.500000"]);
+		expect(buildAtempoFilters(0.75)).toEqual(["atempo=0.750000"]);
+	});
+
+	it("chains multiple atempo filters for speeds > 2.0", () => {
+		expect(buildAtempoFilters(4.0)).toEqual(["atempo=2.0", "atempo=2.000000"]);
+		expect(buildAtempoFilters(3.0)).toEqual(["atempo=2.0", "atempo=1.500000"]);
+	});
+
+	it("chains multiple atempo filters for speeds < 0.5", () => {
+		expect(buildAtempoFilters(0.25)).toEqual(["atempo=0.5", "atempo=0.500000"]);
+	});
+});
 
 describe("getAudioSyncAdjustment", () => {
 	it("does not speed up longer audio tracks that would advance speech", () => {
@@ -208,4 +232,3 @@ describe("buildCinematicVideoFilter", () => {
 		);
 	});
 });
-

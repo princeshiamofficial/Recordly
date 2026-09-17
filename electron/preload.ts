@@ -1046,4 +1046,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.invoke("extensions:reviews-list", params),
 	extensionsReviewUpdate: (reviewId: string, status: string, notes?: string) =>
 		ipcRenderer.invoke("extensions:review-update", reviewId, status, notes),
+
+	// ── Licensing & Entitlements ─────────────────────────────────────────
+	getLicenseStatus: () => ipcRenderer.invoke("license:get-status"),
+	activateLicense: (key: string) => ipcRenderer.invoke("license:activate", key),
+	deactivateLicense: () => ipcRenderer.invoke("license:deactivate"),
 });

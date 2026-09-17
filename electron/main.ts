@@ -180,7 +180,7 @@ let isCreatingMainWindow = false;
 let isCreatingEditorWindow = false;
 let activeUpdateNotification: Notification | null = null;
 let activeUpdateNotificationKey: string | null = null;
-const shouldEnforceSingleInstanceLock = !IS_DEV;
+const shouldEnforceSingleInstanceLock = !IS_DEV && !IS_SMOKE_EXPORT;
 const hasSingleInstanceLock = shouldEnforceSingleInstanceLock
 	? app.requestSingleInstanceLock()
 	: true;

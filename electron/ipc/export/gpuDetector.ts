@@ -17,21 +17,26 @@ export function getFriendlyEncoderDisplayName(encoderName: string): {
 	displayName: string;
 	isHardware: boolean;
 } {
-	switch (encoderName) {
-		case "h264_nvenc":
-			return { displayName: "NVIDIA NVENC (Hardware)", isHardware: true };
-		case "h264_qsv":
-			return { displayName: "Intel QuickSync (Hardware)", isHardware: true };
-		case "h264_amf":
-			return { displayName: "AMD AMF (Hardware)", isHardware: true };
-		case "h264_videotoolbox":
-			return { displayName: "Apple VideoToolbox (Hardware)", isHardware: true };
-		case "h264_mf":
-			return { displayName: "MediaFoundation (Hardware)", isHardware: true };
-		case "libx264":
-		default:
-			return { displayName: "Multi-Threaded CPU (libx264)", isHardware: false };
+	const lower = encoderName.toLowerCase();
+	if (lower.includes("nvenc")) {
+		return { displayName: "NVIDIA NVENC (Hardware)", isHardware: true };
 	}
+	if (lower.includes("qsv")) {
+		return { displayName: "Intel QuickSync (Hardware)", isHardware: true };
+	}
+	if (lower.includes("amf")) {
+		return { displayName: "AMD AMF (Hardware)", isHardware: true };
+	}
+	if (lower.includes("videotoolbox")) {
+		return { displayName: "Apple VideoToolbox (Hardware)", isHardware: true };
+	}
+	if (lower.includes("mf") || lower.includes("mediafoundation")) {
+		return { displayName: "MediaFoundation (Hardware)", isHardware: true };
+	}
+	if (lower.includes("vaapi")) {
+		return { displayName: "Linux VA-API (Hardware)", isHardware: true };
+	}
+	return { displayName: "Multi-Threaded CPU (libx264)", isHardware: false };
 }
 
 export async function detectSystemEncoderInfo(): Promise<DetectedEncoderInfo> {

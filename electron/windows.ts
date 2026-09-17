@@ -923,6 +923,7 @@ export function createEditorWindow(): BrowserWindow {
 			contextIsolation: true,
 			webSecurity: false,
 			backgroundThrottling: false,
+			devTools: !app.isPackaged,
 		},
 	});
 
@@ -1123,6 +1124,7 @@ export function createDashboardWindow(): BrowserWindow {
 			contextIsolation: true,
 			webSecurity: false,
 			backgroundThrottling: false,
+			devTools: !app.isPackaged,
 		},
 	});
 

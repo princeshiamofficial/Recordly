@@ -872,8 +872,8 @@ export function mapNvidiaCudaWrapperProgressPercentage(progress: NativeStaticLay
 }
 
 export function hasNativeStaticLayoutProgressAdvanced(
-	progress: { currentFrame: number; percentage: number; stage?: string },
-	previous: { currentFrame: number; percentage: number; stage?: string },
+	progress: { currentFrame: number; totalFrames?: number; percentage: number; stage?: string },
+	previous: { currentFrame: number; totalFrames?: number; percentage: number; stage?: string },
 ) {
 	const currentFrame = Math.max(0, Math.floor(progress.currentFrame));
 	const percentage =
@@ -1433,7 +1433,7 @@ async function runFfmpegAudioMux(
 }
 
 export function isHardwareAcceleratedVideoEncoder(encoderName: string) {
-	return /(videotoolbox|nvenc|qsv|amf|mf)/i.test(encoderName);
+	return /(videotoolbox|nvenc|qsv|amf|mf|vaapi)/i.test(encoderName);
 }
 
 export async function removeTemporaryExportFile(filePath: string | null | undefined) {

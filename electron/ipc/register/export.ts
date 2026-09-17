@@ -37,6 +37,7 @@ import {
 	settleNativeVideoExportWriteFrameRequest,
 } from "../export/native-video";
 import { getFfmpegBinaryPath } from "../ffmpeg/binary";
+import { getCachedEntitlementsSync } from "../licensing/licenseVerifier";
 import {
 	buildNativeH264StreamExportArgs,
 	buildNativeVideoExportArgs,
@@ -265,6 +266,19 @@ export function registerExportHandlers() {
 					throw new Error("Native export requires even output dimensions");
 				}
 
+				const entitlements = getCachedEntitlementsSync();
+				if (!entitlements.nativeGpu && options.inputMode === "rawvideo") {
+					throw new Error("Native GPU export requires CamVerse Pro.");
+				}
+				if (
+					options.width > entitlements.maxWidth ||
+					options.height > entitlements.maxHeight
+				) {
+					throw new Error(
+						`Native export resolution (${options.width}x${options.height}) exceeds license tier limit (${entitlements.maxWidth}x${entitlements.maxHeight}).`,
+					);
+				}
+
 				const ffmpegPath = getFfmpegBinaryPath();
 				const inputMode = options.inputMode ?? "rawvideo";
 				const sessionId = `recordly-export-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -452,6 +466,20 @@ export function registerExportHandlers() {
 				if (!options || typeof options.inputPath !== "string") {
 					throw new Error("Native static layout export requires an input path");
 				}
+
+				const entitlements = getCachedEntitlementsSync();
+				if (!entitlements.nativeGpu) {
+					throw new Error("Native GPU export requires CamVerse Pro.");
+				}
+				if (
+					options.width > entitlements.maxWidth ||
+					options.height > entitlements.maxHeight
+				) {
+					throw new Error(
+						`Native export resolution (${options.width}x${options.height}) exceeds license tier limit (${entitlements.maxWidth}x${entitlements.maxHeight}).`,
+					);
+				}
+
 				const sanitizedOptions = await sanitizeNativeStaticLayoutExportOptions(options);
 
 				const result = await exportNativeStaticLayoutVideo(

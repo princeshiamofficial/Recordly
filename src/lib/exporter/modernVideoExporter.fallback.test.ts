@@ -1,5 +1,6 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ModernVideoExporter as ModernVideoExporterClass } from "./modernVideoExporter";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { FrameRenderer } from "./modernFrameRenderer";
+import { ModernVideoExporter } from "./modernVideoExporter";
 
 const mocks = vi.hoisted(() => {
 	const videoInfo = {
@@ -68,12 +69,6 @@ vi.mock("./muxer", () => ({
 }));
 
 describe("ModernVideoExporter native fallback routing", () => {
-	let ModernVideoExporter: typeof ModernVideoExporterClass;
-
-	beforeAll(async () => {
-		({ ModernVideoExporter } = await import("./modernVideoExporter"));
-	}, 30_000);
-
 	afterEach(() => {
 		vi.clearAllMocks();
 		vi.unstubAllGlobals();
@@ -291,8 +286,6 @@ describe("ModernVideoExporter native fallback routing", () => {
 	});
 
 	it("forwards cursor click-effect settings into the modern frame renderer", async () => {
-		const { ModernVideoExporter } = await import("./modernVideoExporter");
-		const { FrameRenderer } = await import("./modernFrameRenderer");
 		mocks.streamingDecoderGetEffectiveDuration.mockReturnValue(1);
 
 		const exporter = new ModernVideoExporter({

@@ -20,6 +20,8 @@ interface RecordingControlsProps {
 	paused: boolean;
 	microphoneEnabled: boolean;
 	elapsed: number;
+	isPro?: boolean;
+	maxRecordingSeconds?: number;
 	showTeleprompter?: boolean;
 	onToggleTeleprompter?: () => void;
 	showWebcamPreview?: boolean;
@@ -36,6 +38,8 @@ export const RecordingControls = ({
 	paused,
 	microphoneEnabled,
 	elapsed,
+	isPro,
+	maxRecordingSeconds,
 	showTeleprompter,
 	onToggleTeleprompter,
 	showWebcamPreview,
@@ -48,6 +52,9 @@ export const RecordingControls = ({
 	formatTime,
 }: RecordingControlsProps) => {
 	const t = useScopedT("launch");
+
+	const isFreeLimit = !isPro && typeof maxRecordingSeconds === "number" && Number.isFinite(maxRecordingSeconds);
+	const isNearLimit = isFreeLimit && elapsed >= maxRecordingSeconds - 30;
 
 	const memoizedControls = useMemo(() => {
 		return (
@@ -69,10 +76,20 @@ export const RecordingControls = ({
 
 				<span
 					className={`font-mono text-xs font-semibold min-w-[52px] text-center tracking-[0.02em] ${
-						paused ? "text-[#fbbf24]" : "text-[var(--launch-text)]"
+						isNearLimit
+							? "text-[#f43f5e] animate-pulse font-bold"
+							: paused
+								? "text-[#fbbf24]"
+								: "text-[var(--launch-text)]"
 					}`}
+					title={isFreeLimit ? `Free tier: max ${Math.floor(maxRecordingSeconds / 60)} minutes per recording` : undefined}
 				>
 					{formatTime(elapsed)}
+					{isFreeLimit && (
+						<span className="text-[10px] text-muted-foreground ml-1 font-normal opacity-75">
+							/ {formatTime(maxRecordingSeconds)}
+						</span>
+					)}
 				</span>
 
 				<Separator orientation="vertical" className="mx-[5px] h-6" />
@@ -190,6 +207,9 @@ export const RecordingControls = ({
 		paused,
 		microphoneEnabled,
 		elapsed,
+		isNearLimit,
+		isFreeLimit,
+		maxRecordingSeconds,
 		showWebcamPreview,
 		onToggleWebcamPreview,
 		showTeleprompter,

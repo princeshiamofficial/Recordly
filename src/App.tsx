@@ -7,7 +7,9 @@ import { UpdateToastWindow } from "./components/launch/UpdateToastWindow";
 import { Toaster } from "./components/ui/sonner";
 import { ShortcutsConfigDialog } from "./components/video-editor/ShortcutsConfigDialog";
 import VideoEditor from "./components/video-editor/VideoEditor";
+import { UpgradeProModal } from "./components/licensing/UpgradeProModal";
 import { useI18n } from "./contexts/I18nContext";
+import { LicenseProvider } from "./contexts/LicenseContext";
 import { ShortcutsProvider } from "./contexts/ShortcutsContext";
 import { loadAllCustomFonts } from "./lib/customFonts";
 
@@ -59,10 +61,11 @@ export default function App() {
 	switch (windowType) {
 		case "hud-overlay":
 			return (
-				<>
+				<LicenseProvider>
 					<LaunchWindow />
 					<Toaster className="pointer-events-auto" />
-				</>
+					<UpgradeProModal />
+				</LicenseProvider>
 			);
 		case "source-selector":
 			return <SourceSelector />;
@@ -72,12 +75,20 @@ export default function App() {
 			return <UpdateToastWindow />;
 		case "editor":
 			return (
-				<ShortcutsProvider>
-					<VideoEditor />
-					<ShortcutsConfigDialog />
-				</ShortcutsProvider>
+				<LicenseProvider>
+					<ShortcutsProvider>
+						<VideoEditor />
+						<ShortcutsConfigDialog />
+						<UpgradeProModal />
+					</ShortcutsProvider>
+				</LicenseProvider>
 			);
 		default:
-			return <Dashboard />;
+			return (
+				<LicenseProvider>
+					<Dashboard />
+					<UpgradeProModal />
+				</LicenseProvider>
+			);
 	}
 }

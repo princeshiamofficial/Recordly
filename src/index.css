@@ -29,7 +29,8 @@
 	}
 
 	:root {
-		--app-font-sans: "SF Pro Display", "SF Pro Text", Helvetica, sans-serif;
+		--app-font-sans: "Plus Jakarta Sans", "SF Pro Display", "SF Pro Text", Helvetica, sans-serif;
+		--font-handwriting: "Caveat", cursive, sans-serif;
 		--brand-accent: #2563eb;
 		--brand-accent-rgb: 37, 99, 235;
 		--background: 0 0% 100%;
@@ -182,8 +183,13 @@
 
 	/* Hidden scrollbar - still scrollable but invisible */
 	.custom-scrollbar {
-		scrollbar-width: none; /* Firefox */
 		-ms-overflow-style: none; /* IE/Edge */
+	}
+
+	@supports (scrollbar-width: none) {
+		.custom-scrollbar {
+			scrollbar-width: none; /* Modern browsers & Firefox */
+		}
 	}
 
 	.custom-scrollbar::-webkit-scrollbar {
@@ -289,6 +295,7 @@
 	cursor: pointer;
 	text-decoration: none;
 	outline: none;
+	-webkit-user-select: none;
 	user-select: none;
 }
 

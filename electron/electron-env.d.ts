@@ -962,6 +962,11 @@ interface Window {
 			status: RendererMarketplaceReviewStatus,
 			notes?: string,
 		) => Promise<{ success: boolean; error?: string }>;
+
+		// ── Licensing & Entitlements ─────────────────────────────────────────
+		getLicenseStatus: () => Promise<import("../src/lib/licensing/types").LicenseStatusPayload>;
+		activateLicense: (key: string) => Promise<import("../src/lib/licensing/types").ActivationResult>;
+		deactivateLicense: () => Promise<{ success: boolean }>;
 	};
 }
 

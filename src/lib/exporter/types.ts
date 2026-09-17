@@ -11,6 +11,7 @@ export interface ExportConfig {
 	experimentalNvidiaCudaExport?: boolean;
 	cinematicLook?: CinematicLookPreset;
 	cinematicLetterbox?: boolean;
+	showWatermark?: boolean;
 	maxEncodeQueue?: number;
 	maxDecodeQueue?: number;
 	maxPendingFrames?: number;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AudioRegion, SpeedRegion, TrimRegion } from "@/components/video-editor/types";
+import type { AudioRegion, SpeedRegion, TrimRegion } from "../../components/video-editor/types";
 import { buildEditedTrackSourceSegments, classifyEditedTrackStrategy } from "./editedTrackStrategy";
 
 const SOURCE_DURATION_MS = 20_000;
@@ -86,7 +86,7 @@ describe("editedTrackStrategy", () => {
 	it("falls back for speeds outside the conservative filtergraph window", () => {
 		const speedRegions = [
 			{ id: "speed-1", startMs: 2_000, endMs: 10_000, speed: 2.5 },
-		] as SpeedRegion[];
+		] as unknown as SpeedRegion[];
 
 		expect(
 			classifyEditedTrackStrategy({

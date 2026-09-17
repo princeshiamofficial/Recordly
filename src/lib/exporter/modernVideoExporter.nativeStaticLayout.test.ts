@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AudioRegion, SpeedRegion } from "@/components/video-editor/types";
+import type { AudioRegion, SpeedRegion } from "../../components/video-editor/types";
 import { ModernVideoExporter } from "./modernVideoExporter";
 import type { DecodedVideoInfo } from "./streamingDecoder";
 
@@ -343,9 +343,10 @@ describe("ModernVideoExporter native static-layout eligibility", () => {
 
 	it("uses the default wallpaper for native static-layout when the project has no wallpaper", async () => {
 		const exporter = createExporter({ wallpaper: "" });
-		const electronAPI = window.electronAPI as typeof window.electronAPI & {
-			getAssetBasePath: () => Promise<string>;
-			listAssetDirectory: () => Promise<{ success: true; files: string[] }>;
+		const electronAPI = (window as unknown as { electronAPI: Record<string, unknown> })
+			.electronAPI as {
+			getAssetBasePath: ReturnType<typeof vi.fn>;
+			listAssetDirectory: ReturnType<typeof vi.fn>;
 		};
 		electronAPI.getAssetBasePath = vi.fn(async () => "file:///C:/Recordly/resources/");
 		electronAPI.listAssetDirectory = vi.fn(async () => ({
@@ -418,11 +419,22 @@ describe("ModernVideoExporter native static-layout eligibility", () => {
 		);
 	});
 
+	it("skips native static-layout when showWatermark is true", () => {
+		const exporter = createExporter({
+			showWatermark: true,
+		});
+
+		expect(
+			exporter.getNativeStaticLayoutSkipReasons({ audioMode: "none" }, videoInfo, 60),
+		).toContain("unsupported-watermark-overlay");
+	});
+
 	it("materializes uploaded data-url image backgrounds for native static-layout", async () => {
 		const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
 		const dataUrl = `data:image/jpeg;base64,${Buffer.from(jpegBytes).toString("base64")}`;
 		const exporter = createExporter({ wallpaper: dataUrl });
-		const electronAPI = window.electronAPI as typeof window.electronAPI & {
+		const electronAPI = (window as unknown as { electronAPI: Record<string, unknown> })
+			.electronAPI as {
 			openExportStream: ReturnType<typeof vi.fn>;
 			writeExportStreamChunk: ReturnType<typeof vi.fn>;
 			closeExportStream: ReturnType<typeof vi.fn>;
@@ -561,10 +573,10 @@ describe("ModernVideoExporter native static-layout eligibility", () => {
 	});
 
 	it("builds native timeline maps for the editor speed range endpoints", () => {
-		const speedRegions: SpeedRegion[] = [
+		const speedRegions = [
 			{ id: "speed-1", startMs: 1_000, endMs: 2_000, speed: 0.25 },
 			{ id: "speed-2", startMs: 4_000, endMs: 5_000, speed: 30 },
-		];
+		] as unknown as SpeedRegion[];
 		const exporter = createExporter({ speedRegions });
 
 		expect(
@@ -626,9 +638,9 @@ describe("ModernVideoExporter native static-layout eligibility", () => {
 	});
 
 	it("rejects native static-layout when speed edits are outside the editor speed range", () => {
-		const speedRegions: SpeedRegion[] = [
+		const speedRegions = [
 			{ id: "speed-1", startMs: 1_000, endMs: 4_000, speed: 31 },
-		];
+		] as unknown as SpeedRegion[];
 		const exporter = createExporter({ speedRegions });
 
 		expect(

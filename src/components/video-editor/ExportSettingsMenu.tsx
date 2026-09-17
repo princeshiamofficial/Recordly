@@ -1,13 +1,16 @@
 import {
+	Crown,
 	DownloadSimple as Download,
 	FilmSlate as Film,
 	Image,
 	Lightning,
+	Sparkle,
 } from "@phosphor-icons/react";
 import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { useScopedT } from "@/contexts/I18nContext";
+import { useLicense } from "@/contexts/LicenseContext";
 import type {
 	CinematicLookPreset,
 	ExportEncodingMode,
@@ -94,6 +97,7 @@ export function ExportSettingsMenu({
 	className,
 }: ExportSettingsMenuProps) {
 	const tSettings = useScopedT("settings");
+	const { isPro, entitlements, openUpgradeModal } = useLicense();
 	const isLegacyModel = exportPipelineModel === "legacy";
 	const [detectedEncoder, setDetectedEncoder] = useState<{
 		encoderName: string;
@@ -129,9 +133,17 @@ export function ExportSettingsMenu({
 			)}
 		>
 			<div className="mb-2 flex items-center justify-between">
-				<span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-					{tSettings("export.title", "Export")}
-				</span>
+				<div className="flex items-center gap-1.5">
+					<span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+						{tSettings("export.title", "Export")}
+					</span>
+					{isPro ? (
+						<span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-black uppercase tracking-wider">
+							<Crown weight="fill" className="h-2.5 w-2.5" />
+							PRO
+						</span>
+					) : null}
+				</div>
 				{detectedEncoder ? (
 					<span
 						className={cn(
@@ -141,13 +153,17 @@ export function ExportSettingsMenu({
 								: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
 						)}
 						title={
-							detectedEncoder.gpuModel
-								? `${detectedEncoder.displayName} (${detectedEncoder.gpuModel})`
-								: detectedEncoder.displayName
+							detectedEncoder.isHardware
+								? detectedEncoder.gpuModel
+									? `${detectedEncoder.displayName} (${detectedEncoder.gpuModel})`
+									: detectedEncoder.displayName
+								: "Multi-threaded in-browser WebCodecs export engine"
 						}
 					>
 						<Lightning weight="fill" className="h-3 w-3" />
-						{detectedEncoder.displayName}
+						{detectedEncoder.isHardware
+							? detectedEncoder.displayName
+							: "WebCodecs (CPU Engine)"}
 					</span>
 				) : null}
 			</div>
@@ -208,12 +224,23 @@ export function ExportSettingsMenu({
 								},
 							] as const
 						).map((option) => {
+							const isGated =
+								!isPro &&
+								(option.value === "8k" ||
+									option.value === "4k" ||
+									option.value === "2k");
 							const isActive = exportQuality === option.value;
 							return (
 								<button
 									key={option.value}
 									type="button"
-									onClick={() => onExportQualityChange?.(option.value)}
+									onClick={() => {
+										if (isGated) {
+											openUpgradeModal("4k_export");
+											return;
+										}
+										onExportQualityChange?.(option.value);
+									}}
 									aria-pressed={isActive}
 									className="relative rounded-lg px-1 py-1.5 text-[11px] font-medium transition-colors"
 								>
@@ -231,12 +258,18 @@ export function ExportSettingsMenu({
 									<span className="relative z-10 flex h-full flex-col items-center justify-center leading-tight">
 										<span
 											className={cn(
+												"inline-flex items-center gap-1",
 												isActive
 													? "text-white dark:text-black font-semibold"
 													: "text-muted-foreground hover:text-foreground",
 											)}
 										>
 											{option.label}
+											{isGated ? (
+												<span className="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-500">
+													PRO
+												</span>
+											) : null}
 										</span>
 										{mp4OutputDimensions &&
 										mp4OutputDimensions[option.value] ? (
@@ -646,6 +679,27 @@ export function ExportSettingsMenu({
 							/>
 						</div>
 					</div>
+				</div>
+			)}
+
+			{!entitlements.watermarkFree ? (
+				<div className="mb-2.5 flex items-center justify-between rounded-xl border border-foreground/5 bg-foreground/5 p-2 px-2.5 text-[11px]">
+					<div className="flex items-center gap-1.5 text-muted-foreground">
+						<Sparkle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+						<span>Includes subtle CamVerse watermark</span>
+					</div>
+					<button
+						type="button"
+						onClick={() => openUpgradeModal("watermark")}
+						className="font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+					>
+						Remove
+					</button>
+				</div>
+			) : (
+				<div className="mb-2.5 flex items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 p-1.5 px-2.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+					<Crown weight="fill" className="h-3 w-3 shrink-0" />
+					<span>Pro Active: Watermark-Free & Full Quality</span>
 				</div>
 			)}
 

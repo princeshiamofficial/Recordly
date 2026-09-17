@@ -17,7 +17,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { RxDragHandleDots2 } from "react-icons/rx";
 import { Separator } from "@/components/ui/separator";
-import { useScopedT } from "../../contexts/I18nContext";
+import { toast } from "sonner";
+import { useI18n, useScopedT } from "../../contexts/I18nContext";
+import { useLicense } from "../../contexts/LicenseContext";
 import { useMicrophoneDevices } from "../../hooks/useMicrophoneDevices";
 import { useScreenRecorder } from "../../hooks/useScreenRecorder";
 import { useVideoDevices } from "../../hooks/useVideoDevices";
@@ -89,9 +91,23 @@ function LaunchWindowContent() {
 		preparePermissions,
 	} = useScreenRecorder();
 
+	const { isPro, entitlements, openUpgradeModal } = useLicense();
 	const { elapsed, formatTime } = useRecordingTimer(recording, paused);
 	const hudContentRef = useRef<HTMLDivElement>(null);
 	const hudBarRef = useRef<HTMLDivElement>(null);
+
+	// Enforce Free tier recording duration limit (max 5 minutes per recording)
+	const maxRecordingSeconds = entitlements.maxRecordingSeconds ?? 300;
+	useEffect(() => {
+		if (recording && !isPro && Number.isFinite(maxRecordingSeconds) && elapsed >= maxRecordingSeconds) {
+			toggleRecording();
+			toast.warning(
+				"Free limit reached (max 5 minutes per recording). Upgrade to CamVerse Pro for unlimited recording!",
+				{ duration: 7000 },
+			);
+			openUpgradeModal("5-minute Free limit reached");
+		}
+	}, [recording, isPro, maxRecordingSeconds, elapsed, toggleRecording, openUpgradeModal]);
 
 	const {
 		selectedSource,
@@ -225,6 +241,8 @@ function LaunchWindowContent() {
 			paused={paused}
 			microphoneEnabled={microphoneEnabled}
 			elapsed={elapsed}
+			isPro={isPro}
+			maxRecordingSeconds={maxRecordingSeconds}
 			showWebcamPreview={showFloatingWebcamPreview}
 			onToggleWebcamPreview={
 				webcamEnabled ? () => setShowFloatingWebcamPreview((prev) => !prev) : undefined

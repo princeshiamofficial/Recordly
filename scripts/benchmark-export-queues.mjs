@@ -692,7 +692,8 @@ async function runVariant(
 	);
 	const startedAt = performance.now();
 	const runLabel = `${benchmarkRequest.label}/${variant.name}#${runIndex + 1}`;
-	const child = spawn(electron, [repoRoot], {
+	const tempUserDataDir = path.join(path.dirname(inputPath), "user-data");
+	const child = spawn(electron, [repoRoot, `--user-data-dir=${tempUserDataDir}`], {
 		cwd: repoRoot,
 		env: {
 			...process.env,

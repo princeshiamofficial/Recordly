@@ -21,8 +21,9 @@ export function buildAtempoFilters(tempoRatio: number): string[] {
 		remaining /= 2.0;
 	}
 
-	if (Math.abs(remaining - 1) > ATEMPO_FILTER_EPSILON) {
-		filters.push(`atempo=${remaining.toFixed(6)}`);
+	const clampedRemaining = Math.min(2, Math.max(0.5, remaining));
+	if (Math.abs(clampedRemaining - 1) > ATEMPO_FILTER_EPSILON) {
+		filters.push(`atempo=${clampedRemaining.toFixed(6)}`);
 	}
 
 	return filters;
@@ -278,10 +279,7 @@ export function buildCinematicVideoFilter(
 			break;
 		case "vibrant":
 			// Studio punchy colors and deep contrast
-			filters.push(
-				"eq=contrast=1.12:saturation=1.25:gamma=1.02",
-				"unsharp=3:3:0.5:3:3:0.0",
-			);
+			filters.push("eq=contrast=1.12:saturation=1.25:gamma=1.02", "unsharp=3:3:0.5:3:3:0.0");
 			break;
 		case "film":
 			// Classic Film: gentle warm curve, lower saturation, fine grain, subtle vignette
@@ -308,4 +306,3 @@ export function buildCinematicVideoFilter(
 
 	return filters.length > 0 ? filters.join(",") : null;
 }
-

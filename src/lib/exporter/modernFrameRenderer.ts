@@ -101,6 +101,8 @@ import {
 	WEBCAM_SHADOW_LAYER_PROFILES,
 } from "./shadowProfile";
 import { buildTemporalSamplePlanUs, getTemporalMotionBlurConfig } from "./temporalMotionBlur";
+import { WATERMARK_ASPECT_RATIO, WATERMARK_LOGO_BASE64 } from "./watermarkLogoData";
+import { getTikTokWatermarkLayout } from "./tiktokWatermarkLayout";
 
 const TEMPORAL_ZOOM_MOTION_BLUR_ENABLED = false;
 
@@ -166,6 +168,7 @@ interface FrameRenderConfig {
 	zoomClassicMode?: boolean;
 	frame?: string | null;
 	nativeReadbackMode?: "pixels" | "canvas";
+	showWatermark?: boolean;
 }
 
 interface AnimationState {
@@ -395,6 +398,16 @@ export class FrameRenderer {
 	private captionContainer: Container | null = null;
 	private webcamRootContainer: Container | null = null;
 	private webcamContainer: Container | null = null;
+	private watermarkSprite: Sprite | null = null;
+	private watermarkImage: HTMLImageElement | null = null;
+	private watermarkBadgeCanvas: HTMLCanvasElement | null = null;
+	private watermarkBadgeWidth = 0;
+	private watermarkBadgeHeight = 0;
+	private watermarkPadX = 0;
+	private watermarkPadY = 0;
+	private watermarkCurrentX = 0;
+	private watermarkCurrentY = 0;
+	private watermarkCurrentAlpha = 0.95;
 	private videoSprite: Sprite | null = null;
 	private videoTextureSource: MutableVideoTextureSource | null = null;
 	private backgroundSprite: Sprite | null = null;
@@ -585,6 +598,10 @@ export class FrameRenderer {
 		this.overlayContainer.addChild(this.webcamRootContainer);
 		this.cameraContainer.addChild(this.annotationContainer);
 		this.overlayContainer.addChild(this.captionContainer);
+
+		if (this.config.showWatermark) {
+			await this.setupWatermark();
+		}
 
 		this.videoMaskGraphics = new Graphics();
 		this.videoContainer.addChild(this.videoMaskGraphics);
@@ -1580,6 +1597,7 @@ export class FrameRenderer {
 		);
 
 		this.drawCaptionOverlay(context);
+		this.drawWatermarkOverlay(context, timeMs);
 		this.outputCanvasOverride = canvas;
 	}
 
@@ -3025,6 +3043,7 @@ export class FrameRenderer {
 			this.updateCaptionLayer(timeMs);
 		}
 		this.updateWebcamOverlay(webcamRenderTimeSeconds);
+		this.updateWatermarkOverlay(timeMs);
 
 		const annotationContainerVisible = this.annotationContainer?.visible ?? true;
 		const captionContainerVisible = this.captionContainer?.visible ?? true;
@@ -3276,6 +3295,7 @@ export class FrameRenderer {
 		this.updateAnnotationLayer(timeMs);
 		this.updateCaptionLayer(timeMs);
 		this.updateWebcamOverlay();
+		this.updateWatermarkOverlay(timeMs);
 
 		if (this.hasActiveBlurAnnotations(timeMs)) {
 			const annotationContainerVisible = this.annotationContainer?.visible ?? true;
@@ -3420,6 +3440,7 @@ export class FrameRenderer {
 		executeExtensionRenderHooks("post-webcam", this.compositeCtx, hookParams);
 		executeExtensionRenderHooks("post-annotations", this.compositeCtx, hookParams);
 		executeExtensionRenderHooks("final", this.compositeCtx, hookParams);
+		this.drawWatermarkOverlay(this.compositeCtx, timeMs);
 	}
 
 	private getCursorPosition(
@@ -3857,6 +3878,232 @@ export class FrameRenderer {
 		return this.rendererBackend;
 	}
 
+	private async setupWatermark(): Promise<void> {
+		if (this.watermarkSprite) {
+			return;
+		}
+
+		if (!this.watermarkImage && typeof Image !== "undefined") {
+			try {
+				const img = new Image();
+				await new Promise<void>((resolve) => {
+					let settled = false;
+					const timer = setTimeout(() => {
+						if (!settled) {
+							settled = true;
+							this.watermarkImage = img.complete && img.naturalWidth > 0 ? img : null;
+							resolve();
+						}
+					}, 2000);
+					img.onload = () => {
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							this.watermarkImage = img;
+							resolve();
+						}
+					};
+					img.onerror = () => {
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							this.watermarkImage = null;
+							resolve();
+						}
+					};
+					img.src = WATERMARK_LOGO_BASE64;
+					if (img.complete && img.naturalWidth > 0) {
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							this.watermarkImage = img;
+							resolve();
+						}
+					}
+				});
+			} catch {
+				this.watermarkImage = null;
+			}
+		}
+
+		this.watermarkSprite = this.createWatermarkSprite();
+		if (this.watermarkSprite && this.overlayContainer) {
+			this.overlayContainer.addChild(this.watermarkSprite);
+		}
+	}
+
+	private createWatermarkSprite(): Sprite | null {
+		const scale = Math.max(0.75, Math.min(2.5, this.config.width / 1920));
+		// Position at TOP-LEFT corner (aligned with user interface preference)
+		const padX = Math.round(28 * scale);
+		const padY = Math.round(24 * scale);
+		this.watermarkPadX = padX;
+		this.watermarkPadY = padY;
+
+		if (this.watermarkImage && this.watermarkImage.naturalWidth > 0) {
+			const img = this.watermarkImage;
+			const aspect = img.naturalWidth / img.naturalHeight || WATERMARK_ASPECT_RATIO;
+
+			// Proportional branding badge sized for crystal-clear Full HD visibility
+			const badgeH = Math.round(46 * scale);
+			const innerLogoH = Math.round(30 * scale);
+			const innerLogoW = Math.round(innerLogoH * aspect);
+			const hPad = Math.round(14 * scale);
+			const badgeW = innerLogoW + hPad * 2;
+			this.watermarkBadgeWidth = badgeW;
+			this.watermarkBadgeHeight = badgeH;
+
+			// 2x HiDPI canvas for ultra-crisp Full HD / 4K Retina quality
+			const dpr = 2;
+			const canvas = document.createElement("canvas");
+			canvas.width = Math.round(badgeW * dpr);
+			canvas.height = Math.round(badgeH * dpr);
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				return null;
+			}
+
+			ctx.scale(dpr, dpr);
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = "high";
+
+			const radius = Math.round(10 * scale);
+			ctx.beginPath();
+			if (typeof ctx.roundRect === "function") {
+				ctx.roundRect(0, 0, badgeW, badgeH, radius);
+			} else {
+				ctx.rect(0, 0, badgeW, badgeH);
+			}
+			ctx.fillStyle = "rgba(10, 12, 18, 0.72)";
+			ctx.fill();
+			ctx.lineWidth = Math.max(1, 1 * scale);
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+			ctx.stroke();
+
+			const logoX = (badgeW - innerLogoW) / 2;
+			const logoY = (badgeH - innerLogoH) / 2;
+			ctx.drawImage(img, logoX, logoY, innerLogoW, innerLogoH);
+
+			this.watermarkBadgeCanvas = canvas;
+
+			const texture = Texture.from(canvas);
+			const sprite = new Sprite(texture);
+			sprite.width = badgeW;
+			sprite.height = badgeH;
+			sprite.position.set(padX, padY);
+			sprite.alpha = 0.96;
+			return sprite;
+		}
+
+		const badgeW = Math.round(150 * scale);
+		const badgeH = Math.round(38 * scale);
+		this.watermarkBadgeWidth = badgeW;
+		this.watermarkBadgeHeight = badgeH;
+
+		const canvas = document.createElement("canvas");
+		canvas.width = badgeW;
+		canvas.height = badgeH;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			return null;
+		}
+
+		const radius = Math.round(8 * scale);
+		ctx.beginPath();
+		if (typeof ctx.roundRect === "function") {
+			ctx.roundRect(0, 0, badgeW, badgeH, radius);
+		} else {
+			ctx.rect(0, 0, badgeW, badgeH);
+		}
+		ctx.fillStyle = "rgba(10, 12, 18, 0.72)";
+		ctx.fill();
+		ctx.lineWidth = Math.max(1, 1 * scale);
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+		ctx.stroke();
+
+		const iconR = Math.round(6 * scale);
+		const iconX = Math.round(18 * scale);
+		const iconY = badgeH / 2;
+		ctx.beginPath();
+		ctx.arc(iconX, iconY, iconR, 0, Math.PI * 2);
+		ctx.fillStyle = "#F59E0B";
+		ctx.fill();
+
+		const fontSize = Math.round(13 * scale);
+		ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+		ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+		ctx.textBaseline = "middle";
+		ctx.fillText("CamVerse", Math.round(30 * scale), iconY);
+
+		this.watermarkBadgeCanvas = canvas;
+
+		const texture = Texture.from(canvas);
+		const sprite = new Sprite(texture);
+		sprite.position.set(padX, padY);
+		sprite.alpha = 0.92;
+		return sprite;
+	}
+
+	private updateWatermarkOverlay(timeMs: number): void {
+		if (!this.config.showWatermark || (!this.watermarkSprite && !this.watermarkBadgeCanvas)) {
+			return;
+		}
+		const scale = Math.max(0.75, Math.min(2.5, this.config.width / 1920));
+		const layout = getTikTokWatermarkLayout(
+			timeMs,
+			this.config.width,
+			this.config.height,
+			this.watermarkBadgeWidth,
+			this.watermarkBadgeHeight,
+			scale,
+		);
+		this.watermarkCurrentX = layout.x;
+		this.watermarkCurrentY = layout.y;
+		this.watermarkCurrentAlpha = layout.alpha;
+
+		if (this.watermarkSprite) {
+			this.watermarkSprite.position.set(layout.x, layout.y);
+			this.watermarkSprite.alpha = layout.alpha;
+		}
+	}
+
+	private drawWatermarkOverlay(ctx: CanvasRenderingContext2D, timeMs?: number): void {
+		if (!this.config.showWatermark || !this.watermarkBadgeCanvas) {
+			return;
+		}
+		let x = this.watermarkCurrentX || this.watermarkPadX;
+		let y = this.watermarkCurrentY || this.watermarkPadY;
+		let alpha = this.watermarkCurrentAlpha ?? 0.95;
+
+		if (timeMs !== undefined) {
+			const scale = Math.max(0.75, Math.min(2.5, this.config.width / 1920));
+			const layout = getTikTokWatermarkLayout(
+				timeMs,
+				this.config.width,
+				this.config.height,
+				this.watermarkBadgeWidth,
+				this.watermarkBadgeHeight,
+				scale,
+			);
+			x = layout.x;
+			y = layout.y;
+			alpha = layout.alpha;
+		}
+
+		ctx.save();
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = "high";
+		ctx.globalAlpha = alpha;
+		ctx.drawImage(
+			this.watermarkBadgeCanvas,
+			x,
+			y,
+			this.watermarkBadgeWidth,
+			this.watermarkBadgeHeight,
+		);
+		ctx.restore();
+	}
+
 	destroy(): void {
 		const texturesToDestroy = new Set<Texture>();
 		if (this.videoSprite?.texture) {
@@ -3873,6 +4120,9 @@ export class FrameRenderer {
 		}
 		if (this.frameSprite?.texture) {
 			texturesToDestroy.add(this.frameSprite.texture);
+		}
+		if (this.watermarkSprite?.texture) {
+			texturesToDestroy.add(this.watermarkSprite.texture);
 		}
 		for (const layer of this.videoShadowLayers) {
 			if (layer.sprite?.texture) {
@@ -4004,5 +4254,7 @@ export class FrameRenderer {
 		this.webcamRenderMode = "hidden";
 		this.webcamLayoutCache = null;
 		this.layoutCache = null;
+		this.watermarkSprite = null;
+		this.watermarkImage = null;
 	}
 }

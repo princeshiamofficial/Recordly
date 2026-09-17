@@ -8,8 +8,8 @@ import type {
 	CursorStyle,
 	CursorTelemetryPoint,
 	Padding,
-	SpeedRegion,
 	SourceAudioTrackSettings,
+	SpeedRegion,
 	TrimRegion,
 	WebcamOverlaySettings,
 	ZoomMotionBlurTuning,
@@ -100,6 +100,7 @@ interface VideoExporterConfig extends ExportConfig {
 	previewHeight?: number;
 	onProgress?: (progress: ExportProgress) => void;
 	preferredEncoderPath?: SupportedMp4EncoderPath | null;
+	showWatermark?: boolean;
 }
 
 type NativeAudioPlan =
@@ -188,6 +189,37 @@ export class VideoExporter {
 			this.progressSampleStartTimeMs = this.exportStartTimeMs;
 			this.progressSampleStartFrame = 0;
 
+			// Licensing & Entitlements Gate
+			let isWatermarkFree = false;
+			let maxWidth = 1920;
+			let maxHeight = 1080;
+
+			if (typeof window !== "undefined" && window.electronAPI?.getLicenseStatus) {
+				isWatermarkFree = false;
+				maxWidth = 1920;
+				maxHeight = 1080;
+				try {
+					const licenseStatus = await window.electronAPI.getLicenseStatus();
+					if (licenseStatus?.entitlements) {
+						isWatermarkFree = licenseStatus.entitlements.watermarkFree;
+						maxWidth = licenseStatus.entitlements.maxWidth;
+						maxHeight = licenseStatus.entitlements.maxHeight;
+					}
+				} catch {
+					// Default to Free tier
+				}
+			}
+
+			if (this.config.width > maxWidth || this.config.height > maxHeight) {
+				throw new Error(
+					`Export resolution (${this.config.width}×${this.config.height}) requires CamVerse Pro. The Free tier supports up to 1080p FHD (1920×1080). Please upgrade to Pro or select 1080p.`,
+				);
+			}
+
+			if (!isWatermarkFree) {
+				this.config.showWatermark = true;
+			}
+
 			// Initialize streaming decoder and load video metadata
 			this.streamingDecoder = new StreamingVideoDecoder({
 				maxDecodeQueue: this.config.maxDecodeQueue,
@@ -266,6 +298,7 @@ export class VideoExporter {
 				cursorSway: this.config.cursorSway,
 				zoomSmoothness: this.config.zoomSmoothness,
 				frame: this.config.frame,
+				showWatermark: this.config.showWatermark,
 			});
 			await this.renderer.initialize();
 

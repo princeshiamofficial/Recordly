@@ -15,7 +15,7 @@
   "buildDependenciesFromSource": true,
   "compression": "normal",
   "directories": {
-    "output": "dist-build"
+    "output": "dist-package"
   },
   "files": [
     "dist",

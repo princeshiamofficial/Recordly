@@ -98,7 +98,7 @@ import type {
 	ExportResult,
 } from "./types";
 
-interface VideoExporterConfig extends ExportConfig {
+export interface VideoExporterConfig extends ExportConfig {
 	videoUrl: string;
 	wallpaper: string;
 	zoomRegions: ZoomRegion[];
@@ -389,8 +389,59 @@ export class ModernVideoExporter {
 				this.nativeEncoderError = null;
 				this.nativeStaticLayoutSkipReason = null;
 				this.nativeStaticLayoutSkipReasons = [];
-				this.nativeStaticLayoutBackgroundSkipReason = null;
 				this.totalExportStartTimeMs = this.getNowMs();
+
+				// Licensing & Entitlements Enforcement
+				let isWatermarkFree = true;
+				let maxWidth = 7680;
+				let maxHeight = 4320;
+				let canUseNativeGpu = true;
+
+				if (typeof window !== "undefined" && window.electronAPI?.getLicenseStatus) {
+					// In Electron runtime: default to Free tier and query active license
+					isWatermarkFree = false;
+					maxWidth = 1920;
+					maxHeight = 1080;
+					canUseNativeGpu = false;
+
+					try {
+						const licenseStatus = await window.electronAPI.getLicenseStatus();
+						if (licenseStatus?.entitlements) {
+							isWatermarkFree = licenseStatus.entitlements.watermarkFree;
+							maxWidth = licenseStatus.entitlements.maxWidth;
+							maxHeight = licenseStatus.entitlements.maxHeight;
+							canUseNativeGpu = licenseStatus.entitlements.nativeGpu;
+						}
+					} catch {
+						// Default to Free tier if check fails
+					}
+				}
+
+				// Check 1: Explicit rejection if resolution exceeds user tier
+				if (this.config.width > maxWidth || this.config.height > maxHeight) {
+					throw new Error(
+						`Export resolution (${this.config.width}×${this.config.height}) requires CamVerse Pro. The Free tier supports up to 1080p FHD (1920×1080). Please upgrade to Pro or select 1080p.`,
+					);
+				}
+
+				// Check 2: Enforce watermark for Free tier
+				if (!isWatermarkFree) {
+					this.config.showWatermark = true;
+				}
+
+				// Check 3: Native GPU Compositor gating
+				if (
+					!canUseNativeGpu &&
+					(this.config.experimentalNvidiaCudaExport ||
+						this.config.experimentalNativeExport)
+				) {
+					console.log(
+						"[VideoExporter] Native GPU Compositor requires CamVerse Pro, falling back to WebCodecs.",
+					);
+					this.config.experimentalNvidiaCudaExport = false;
+					this.config.experimentalNativeExport = false;
+				}
+
 				const backendPreference = this.config.backendPreference ?? "auto";
 				const runtimePlatform = this.getRuntimePlatform();
 				let useNativeEncoder = false;
@@ -398,9 +449,10 @@ export class ModernVideoExporter {
 				const prefersNativeStaticLayoutBeforeBreeze =
 					shouldPreferNativeStaticLayoutBeforeBreeze(runtimePlatform, backendPreference);
 				const shouldTryNativeStaticLayout =
-					backendPreference === "breeze" ||
-					this.config.experimentalNvidiaCudaExport === true ||
-					prefersNativeStaticLayoutBeforeBreeze;
+					!this.config.showWatermark &&
+					(backendPreference === "breeze" ||
+						this.config.experimentalNvidiaCudaExport === true ||
+						prefersNativeStaticLayoutBeforeBreeze);
 				let shouldDeferNativeEncoderStart =
 					backendPreference === "breeze" ||
 					this.config.experimentalNvidiaCudaExport === true ||
@@ -648,6 +700,7 @@ export class ModernVideoExporter {
 					zoomSmoothness: this.config.zoomSmoothness,
 					zoomClassicMode: this.config.zoomClassicMode,
 					frame: this.config.frame,
+					showWatermark: this.config.showWatermark,
 				});
 				await this.renderer.initialize();
 				this.rendererInitTimeMs = this.getNowMs() - stageStartedAt;
@@ -1582,6 +1635,10 @@ export class ModernVideoExporter {
 
 		if (this.config.frame) {
 			reasons.push("unsupported-frame-overlay");
+		}
+
+		if (this.config.showWatermark) {
+			reasons.push("unsupported-watermark-overlay");
 		}
 
 		const crop = this.config.cropRegion;
@@ -2637,8 +2694,14 @@ export class ModernVideoExporter {
 			}
 		}
 
-		// If hardware H.264 stream is not available or failed, use direct raw frame native export via FFmpeg
-		return await this.startRawVideoNativeExport();
+		// Only fall back to raw video streaming if user explicitly chose Breeze backend.
+		// For 'auto', return false so we fall back to in-browser WebCodecs GPU acceleration,
+		// avoiding copying 500MB+/s of uncompressed RGBA pixel buffers over Electron IPC.
+		if (this.config.backendPreference === "breeze") {
+			return await this.startRawVideoNativeExport();
+		}
+
+		return false;
 	}
 
 	private async startH264StreamNativeExport(): Promise<boolean> {

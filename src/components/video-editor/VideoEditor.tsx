@@ -53,10 +53,11 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Toaster } from "@/components/ui/sonner";
 import { useI18n } from "@/contexts/I18nContext";
+import { useLicense } from "@/contexts/LicenseContext";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
 import {
-	calculateOutputDimensions,
 	type CinematicLookPreset,
+	calculateOutputDimensions,
 	DEFAULT_MP4_CODEC,
 	type ExportBackendPreference,
 	type ExportEncodingMode,
@@ -401,6 +402,7 @@ function getErrorMessage(error: unknown): string {
 
 export default function VideoEditor() {
 	const { t } = useI18n();
+	const { entitlements: licenseEntitlements } = useLicense();
 	const smokeExportConfig = useMemo(
 		() => getSmokeExportConfig(typeof window === "undefined" ? "" : window.location.search),
 		[],
@@ -4920,6 +4922,7 @@ export default function VideoEditor() {
 						sourceAudioTrackSettings: sourceAudioTrackSettingsForExport,
 						previewWidth,
 						previewHeight,
+						showWatermark: !licenseEntitlements?.watermarkFree,
 						onProgress: (progress: ExportProgress) => {
 							recordSmokeProgress(progress);
 							setExportProgress(progress);
@@ -6181,9 +6184,7 @@ export default function VideoEditor() {
 								className="cybrejon-btn cybrejon-btn-export"
 							>
 								<Download className="h-3.5 w-3.5" />
-								<span>
-									{t("common.actions.export", "Export")}
-								</span>
+								<span>{t("common.actions.export", "Export")}</span>
 							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent

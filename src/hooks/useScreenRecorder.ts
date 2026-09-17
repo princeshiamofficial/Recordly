@@ -1410,6 +1410,42 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		};
 	}, [cleanupCapturedMedia, recoverNativeRecordingSession]);
 
+	// Enforce Free tier recording duration limit (max 5 minutes)
+	useEffect(() => {
+		if (!recording) {
+			return;
+		}
+
+		let limitTimer: NodeJS.Timeout | null = null;
+		limitTimer = setInterval(async () => {
+			if (paused) return;
+			const durationMs = getRecordingDurationMs(Date.now());
+			try {
+				const license = await window.electronAPI?.getLicenseStatus?.();
+				const maxSec = license?.entitlements?.maxRecordingSeconds ?? 300;
+				if (license?.tier !== "pro" && Number.isFinite(maxSec) && durationMs >= maxSec * 1000) {
+					stopRecording.current();
+					toast.warning(
+						"Free recording limit reached (max 5 minutes per recording). Upgrade to CamVerse Pro for unlimited recording!",
+						{ duration: 7000 },
+					);
+				}
+			} catch {
+				if (durationMs >= 300 * 1000) {
+					stopRecording.current();
+					toast.warning(
+						"Free recording limit reached (max 5 minutes per recording). Upgrade to CamVerse Pro for unlimited recording!",
+						{ duration: 7000 },
+					);
+				}
+			}
+		}, 1000);
+
+		return () => {
+			if (limitTimer) clearInterval(limitTimer);
+		};
+	}, [recording, paused, getRecordingDurationMs]);
+
 	const startRecording = async () => {
 		if (startInFlight.current) {
 			return;

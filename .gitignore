@@ -25,8 +25,13 @@ dist-ssr
 *.sw?
 release/**
 release-build/**
+build-win/**
+build-output/**
 dist-release/**
 dist-build/**
+dist-output/**
+dist-win/**
+dist-package/**
 install/**
 .freebuff/
 .gemini/
@@ -51,3 +56,9 @@ electron/native/bin/*/whisper-runtime.json
 tmp-*.ps1
 .tmp-*.ps1
 gpu-export-probe.mp4
+
+# Website separate repository & local secrets
+website/
+website-vite-backup/
+.env
+

@@ -27,6 +27,16 @@ describe("gpuDetector", () => {
 			displayName: "MediaFoundation (Hardware)",
 			isHardware: true,
 		});
+
+		expect(getFriendlyEncoderDisplayName("h264_vaapi")).toEqual({
+			displayName: "Linux VA-API (Hardware)",
+			isHardware: true,
+		});
+
+		expect(getFriendlyEncoderDisplayName("hevc_nvenc")).toEqual({
+			displayName: "NVIDIA NVENC (Hardware)",
+			isHardware: true,
+		});
 	});
 
 	it("maps software libx264 encoder to CPU display label", () => {

@@ -1,6 +1,6 @@
 import type { ExportEncodeBackend, ExportEncodingMode } from "./types";
 
-const DEFAULT_ENCODING_MODE: ExportEncodingMode = "quality";
+const DEFAULT_ENCODING_MODE: ExportEncodingMode = "fast";
 type WebCodecsLatencyMode = "quality" | "realtime";
 const BASELINE_PIXELS_PER_SECOND = 1280 * 720 * 60;
 

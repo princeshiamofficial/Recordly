@@ -20,7 +20,7 @@ vi.mock("../state", () => ({
 }));
 
 const fsMocks = vi.hoisted(() => ({
-	access: vi.fn(async () => {
+	access: vi.fn(async (..._args: unknown[]): Promise<void> => {
 		throw new Error("missing");
 	}),
 	writeFile: vi.fn(async () => undefined),
@@ -577,11 +577,11 @@ describe("resolveExperimentalNvidiaCudaExportScriptPath", () => {
 				value: resourcesPath,
 			});
 			electronAppMock.getAppPath.mockReturnValue("C:\\Recordly\\resources\\app.asar");
-			fsMocks.access.mockImplementation(async (candidate: string) => {
+			fsMocks.access.mockImplementation(async (candidate: unknown) => {
 				if (candidate === unpackedScriptPath || candidate === asarScriptPath) {
 					return;
 				}
-				throw new Error(`missing ${candidate}`);
+				throw new Error(`missing ${String(candidate)}`);
 			});
 
 			expect(await resolveExperimentalNvidiaCudaExportScriptPath()).toBe(unpackedScriptPath);
@@ -594,7 +594,7 @@ describe("resolveExperimentalNvidiaCudaExportScriptPath", () => {
 			if (originalResourcesPath) {
 				Object.defineProperty(process, "resourcesPath", originalResourcesPath);
 			} else {
-				delete (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+				Reflect.deleteProperty(process, "resourcesPath");
 			}
 			electronAppMock.getAppPath.mockReset();
 			electronAppMock.getAppPath.mockReturnValue(process.cwd());
