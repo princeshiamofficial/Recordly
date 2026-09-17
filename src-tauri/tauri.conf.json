@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Recordly",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "productName": "CamVerse",
+  "version": "1.3.5",
+  "identifier": "app.camverse.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "Recordly",
-        "width": 800,
-        "height": 600,
+        "title": "CamVerse — Screen Recorder & Studio Demo Creator",
+        "width": 1280,
+        "height": 800,
         "resizable": true,
         "fullscreen": false
       }
@@ -33,8 +33,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
+    "copyright": "© 2026 CamVerse Technologies. All rights reserved.",
+    "publisher": "CamVerse Technologies",
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/128x128.png",
+        "sidebarImage": "icons/128x128@2x.png",
+        "displayLanguageSelector": false
+      }
     }
   }
 }
